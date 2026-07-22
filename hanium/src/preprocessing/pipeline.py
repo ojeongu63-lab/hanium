@@ -11,6 +11,7 @@ from .columns import (
 )
 from .data_io import load_csv
 from .dedup import remove_exact_duplicates
+from .filtering import remove_non_plasticizing_shots
 from .labels import encode_labels
 from .manifest import build_manifest
 from .outliers import remove_outliers
@@ -28,8 +29,10 @@ def run_pipeline(labeled_path: str, unlabeled_path: str, output_dir: str) -> dic
     labeled = remove_exact_duplicates(raw_labeled)
     labeled = encode_labels(labeled)
 
+    unlabeled_plasticizing = remove_non_plasticizing_shots(raw_unlabeled)
+
     train_clean, removed = remove_outliers(
-        raw_unlabeled, FEATURE_COLUMNS, contamination=CONTAMINATION, random_state=RANDOM_STATE
+        unlabeled_plasticizing, FEATURE_COLUMNS, contamination=CONTAMINATION, random_state=RANDOM_STATE
     )
 
     scaler = fit_scaler(train_clean, FEATURE_COLUMNS)
@@ -60,6 +63,7 @@ def run_pipeline(labeled_path: str, unlabeled_path: str, output_dir: str) -> dic
         raw_labeled_rows=len(raw_labeled),
         labeled_rows_after_dedup=len(labeled),
         raw_unlabeled_rows=len(raw_unlabeled),
+        unlabeled_rows_after_plasticizing_filter=len(unlabeled_plasticizing),
         train_rows_after_cleaning=len(train_clean),
         removed_outlier_rows=len(removed),
         contamination=CONTAMINATION,

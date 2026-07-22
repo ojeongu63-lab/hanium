@@ -6,8 +6,9 @@ def test_build_manifest_records_row_counts_and_columns():
         raw_labeled_rows=6736,
         labeled_rows_after_dedup=3974,
         raw_unlabeled_rows=35239,
-        train_rows_after_cleaning=34886,
-        removed_outlier_rows=353,
+        unlabeled_rows_after_plasticizing_filter=17087,
+        train_rows_after_cleaning=16916,
+        removed_outlier_rows=171,
         contamination=0.01,
         feature_columns=["a", "b"],
         dead_sensor_columns=["dead1"],
@@ -16,7 +17,9 @@ def test_build_manifest_records_row_counts_and_columns():
     )
 
     assert manifest["labeled"]["duplicates_removed"] == 2762
-    assert manifest["unlabeled"]["outliers_removed"] == 353
+    assert manifest["unlabeled"]["non_plasticizing_removed"] == 18152
+    assert manifest["unlabeled"]["rows_after_plasticizing_filter"] == 17087
+    assert manifest["unlabeled"]["outliers_removed"] == 171
     assert manifest["feature_columns"] == ["a", "b"]
     assert manifest["dropped_columns"] == {
         "dead_sensors": ["dead1"],

@@ -8,6 +8,7 @@ def build_manifest(
     raw_labeled_rows: int,
     labeled_rows_after_dedup: int,
     raw_unlabeled_rows: int,
+    unlabeled_rows_after_plasticizing_filter: int,
     train_rows_after_cleaning: int,
     removed_outlier_rows: int,
     contamination: float,
@@ -26,6 +27,8 @@ def build_manifest(
         },
         "unlabeled": {
             "raw_rows": raw_unlabeled_rows,
+            "non_plasticizing_removed": raw_unlabeled_rows - unlabeled_rows_after_plasticizing_filter,
+            "rows_after_plasticizing_filter": unlabeled_rows_after_plasticizing_filter,
             "rows_after_self_cleaning": train_rows_after_cleaning,
             "outliers_removed": removed_outlier_rows,
             "contamination": contamination,
