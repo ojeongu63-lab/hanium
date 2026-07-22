@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from .detrend import apply_rolling_zscore
 from .model import LSTMAutoencoder
 from .scoring import (
     aggregate_eval_shot_errors,
@@ -36,14 +37,23 @@ def run_lstm_pipeline(
     batch_size: int = 64,
     learning_rate: float = 1e-3,
     random_seed: int = 42,
+    detrend_window: int = 200,
+    detrend_min_periods: int = 30,
 ) -> dict:
     torch.manual_seed(random_seed)
 
     train_df = pd.read_csv(train_csv_path)
     eval_df = pd.read_csv(eval_csv_path)
 
-    train_windows = make_train_windows(train_df, feature_columns, window_size)
-    eval_windows = make_eval_windows(eval_df, feature_columns, window_size)
+    train_detrended = apply_rolling_zscore(
+        train_df, feature_columns, window=detrend_window, min_periods=detrend_min_periods
+    )
+    eval_detrended = apply_rolling_zscore(
+        eval_df, feature_columns, window=detrend_window, min_periods=detrend_min_periods
+    )
+
+    train_windows = make_train_windows(train_detrended, feature_columns, window_size)
+    eval_windows = make_eval_windows(eval_detrended, feature_columns, window_size)
 
     model = LSTMAutoencoder(
         num_features=len(feature_columns), hidden_size=hidden_size, latent_dim=latent_dim
@@ -75,6 +85,8 @@ def run_lstm_pipeline(
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "random_seed": random_seed,
+        "detrend_window": detrend_window,
+        "detrend_min_periods": detrend_min_periods,
     }
     (out_dir / "training_config.json").write_text(json.dumps(training_config, indent=2))
 
