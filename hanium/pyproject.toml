@@ -1,7 +1,7 @@
 [project]
 name = "preprocessing"
 version = "0.1.0"
-description = "Add your description here"
+description = "CN7 injection-molding anomaly detection: preprocessing + LSTM autoencoder"
 authors = [
     { name = "jwoh", email = "ojeongu63@gmail.com" }
 ]
