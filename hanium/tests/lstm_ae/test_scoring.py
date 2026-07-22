@@ -45,16 +45,25 @@ def test_aggregate_eval_shot_errors_averages_overlapping_windows():
     np.testing.assert_allclose(result.flatten(), [1.0, 2.5, 4.5, 6.0])
 
 
-def test_compute_threshold_is_mean_plus_three_std():
-    # per-shot scalar error (mean over features) will be exactly [1.0, 2.0, 3.0]
-    # population mean=2.0, population std=sqrt(2/3)=0.816496..., so
-    # threshold = 2.0 + 3*0.816496... = 4.449489...  (independently hand-computed,
-    # not re-derived from the same formula the implementation uses)
-    train_shot_errors = np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
+def test_compute_threshold_is_a_percentile_of_train_shot_errors():
+    # per-shot scalar error (mean over features) will be exactly [10,20,...,100]
+    # (10 values, 2 identical features per row so the mean equals that value).
+    # numpy's default linear interpolation for the 90th percentile of 10 sorted
+    # values: index = 0.90*(10-1) = 8.1 -> between arr[8]=90 and arr[9]=100,
+    # fraction 0.1 -> 90 + 0.1*(100-90) = 91.0 (independently hand-computed).
+    train_shot_errors = np.array([[v, v] for v in range(10, 101, 10)])
+
+    threshold = compute_threshold(train_shot_errors, percentile=90)
+
+    assert threshold == pytest.approx(91.0)
+
+
+def test_compute_threshold_defaults_to_95th_percentile():
+    train_shot_errors = np.array([[v, v] for v in range(10, 101, 10)])
 
     threshold = compute_threshold(train_shot_errors)
 
-    assert threshold == pytest.approx(4.449489742783178)
+    assert threshold == pytest.approx(np.percentile(range(10, 101, 10), 95))
 
 
 def test_evaluate_predictions_computes_precision_recall_and_confusion_counts():

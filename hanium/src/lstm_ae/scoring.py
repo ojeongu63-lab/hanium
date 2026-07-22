@@ -19,9 +19,9 @@ def aggregate_eval_shot_errors(squared_errors: np.ndarray) -> np.ndarray:
     return sums / counts[:, None]
 
 
-def compute_threshold(train_shot_errors: np.ndarray) -> float:
+def compute_threshold(train_shot_errors: np.ndarray, percentile: float = 95.0) -> float:
     per_shot_scalar = train_shot_errors.mean(axis=1)
-    return float(per_shot_scalar.mean() + 3 * per_shot_scalar.std())
+    return float(np.percentile(per_shot_scalar, percentile))
 
 
 def evaluate_predictions(

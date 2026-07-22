@@ -39,6 +39,7 @@ def run_lstm_pipeline(
     random_seed: int = 42,
     detrend_window: int = 200,
     detrend_min_periods: int = 30,
+    threshold_percentile: float = 95.0,
 ) -> dict:
     torch.manual_seed(random_seed)
 
@@ -68,7 +69,7 @@ def run_lstm_pipeline(
     train_shot_errors = flatten_train_shot_errors(train_squared_errors)
     eval_shot_errors = aggregate_eval_shot_errors(eval_squared_errors)
 
-    threshold = compute_threshold(train_shot_errors)
+    threshold = compute_threshold(train_shot_errors, percentile=threshold_percentile)
     labels = eval_df["label"].to_numpy()
     report = evaluate_predictions(eval_shot_errors, threshold, labels)
 
@@ -87,6 +88,7 @@ def run_lstm_pipeline(
         "random_seed": random_seed,
         "detrend_window": detrend_window,
         "detrend_min_periods": detrend_min_periods,
+        "threshold_percentile": threshold_percentile,
     }
     (out_dir / "training_config.json").write_text(json.dumps(training_config, indent=2))
 
