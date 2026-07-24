@@ -25,6 +25,8 @@ def make_eval_windows(
     for experiment_id, group in df.groupby("experiment_id", sort=True):
         values = group[feature_columns].to_numpy(dtype=np.float32)
         num_windows = len(values) - window_size + 1
+        if num_windows <= 0:
+            continue
         windows = np.stack([values[i : i + window_size] for i in range(num_windows)])
         all_windows.append(windows)
         all_experiment_ids.extend([experiment_id] * num_windows)

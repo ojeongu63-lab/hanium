@@ -70,3 +70,20 @@ def test_make_eval_windows_is_overlapping_within_each_experiment():
     np.testing.assert_array_equal(windows[2], exp1_values[2:5])
     np.testing.assert_array_equal(windows[3], exp2_values[0:3])
     np.testing.assert_array_equal(windows[4], exp2_values[1:4])
+
+
+def test_make_eval_windows_skips_experiments_shorter_than_window_size():
+    # experiment 1 has 2 rows (shorter than window_size=3), should be skipped
+    # experiment 2 has 5 rows, window_size=3 -> 3 windows
+    df = _make_df({1: 2, 2: 5}, num_features=1)
+
+    windows, experiment_ids = make_eval_windows(df, ["f0"], window_size=3)
+
+    # Only experiment 2 should contribute windows
+    assert windows.shape == (3, 3, 1)
+    assert experiment_ids.tolist() == [2, 2, 2]
+
+    exp2_values = df.loc[df["experiment_id"] == 2, ["f0"]].to_numpy(dtype=np.float32)
+    np.testing.assert_array_equal(windows[0], exp2_values[0:3])
+    np.testing.assert_array_equal(windows[1], exp2_values[1:4])
+    np.testing.assert_array_equal(windows[2], exp2_values[2:5])
