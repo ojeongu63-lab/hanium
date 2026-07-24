@@ -47,6 +47,18 @@ def run_pipeline(
     index = add_labels(index)
     index_by_id = index.set_index("No")
 
+    all_ids = list(train_experiment_ids) + list(eval_good_experiment_ids) + list(eval_bad_experiment_ids)
+    if len(set(all_ids)) != len(all_ids):
+        raise ValueError("train/eval experiment id lists must be pairwise disjoint")
+
+    for experiment_id in list(train_experiment_ids) + list(eval_good_experiment_ids):
+        if index_by_id.loc[experiment_id, "label"] != 0:
+            raise ValueError(f"experiment {experiment_id} assigned to a good-only split but is labeled bad")
+
+    for experiment_id in eval_bad_experiment_ids:
+        if index_by_id.loc[experiment_id, "label"] != 1:
+            raise ValueError(f"experiment {experiment_id} assigned to eval_bad but is labeled good")
+
     eval_experiment_ids = set(eval_good_experiment_ids) | set(eval_bad_experiment_ids)
 
     train_frames = []

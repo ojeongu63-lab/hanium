@@ -1,6 +1,7 @@
 import json
 
 import pandas as pd
+import pytest
 
 from preprocessing.columns import FEATURE_COLUMNS
 from preprocessing.pipeline import run_pipeline
@@ -93,3 +94,24 @@ def test_run_pipeline_train_never_touches_eval_experiments(tmp_path):
     eval_df = pd.read_csv(output_dir / "eval.csv")
 
     assert set(train_df["experiment_id"]).isdisjoint(set(eval_df["experiment_id"]))
+
+
+def test_run_pipeline_rejects_bad_labeled_experiment_in_train(tmp_path):
+    experiment_dir = tmp_path / "experiments"
+    experiment_dir.mkdir()
+    index_path = tmp_path / "train.csv"
+    output_dir = tmp_path / "processed"
+
+    _make_index_csv(index_path)
+    for i, n in zip([1, 2, 3, 4], [10, 10, 8, 6]):
+        _make_experiment_csv(experiment_dir / f"experiment_{i:02d}.csv", n_rows=n)
+
+    with pytest.raises(ValueError):
+        run_pipeline(
+            experiment_index_path=str(index_path),
+            experiment_dir=str(experiment_dir),
+            output_dir=str(output_dir),
+            train_experiment_ids=[1, 2, 4],  # experiment 4 is labeled bad
+            eval_good_experiment_ids=[3],
+            eval_bad_experiment_ids=[],
+        )

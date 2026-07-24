@@ -1,6 +1,10 @@
 from datetime import datetime, timezone
 
 SOURCE = "CNC 비식별화 원본데이터_1209 (train.csv + experiment_01~25.csv)"
+LABEL_DEFINITION = (
+    "label=0 (good) iff machining_finalized=='yes' AND passed_visual_inspection=='yes'; "
+    "otherwise label=1 (bad)"
+)
 
 
 def build_manifest(
@@ -20,6 +24,7 @@ def build_manifest(
     return {
         "processed_at": datetime.now(timezone.utc).isoformat(),
         "source": SOURCE,
+        "label_definition": LABEL_DEFINITION,
         "total_rows": total_rows,
         "experiment_split": {
             "train": {"experiment_ids": train_experiment_ids, "rows": train_rows},

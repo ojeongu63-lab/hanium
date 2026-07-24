@@ -1,4 +1,4 @@
-from preprocessing.manifest import build_manifest
+from preprocessing.manifest import LABEL_DEFINITION, build_manifest
 
 
 def test_build_manifest_records_split_and_columns():
@@ -35,3 +35,4 @@ def test_build_manifest_records_split_and_columns():
     assert manifest["metadata_excluded_columns"] == ["meta1"]
     assert "processed_at" in manifest
     assert "source" in manifest
+    assert manifest["label_definition"] == LABEL_DEFINITION
