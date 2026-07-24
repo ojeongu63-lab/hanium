@@ -1,4 +1,4 @@
-from cnc_preprocessing.columns import (
+from preprocessing.columns import (
     DEAD_SENSOR_COLUMNS,
     FEATURE_COLUMNS,
     METADATA_EXCLUDED_COLUMNS,
