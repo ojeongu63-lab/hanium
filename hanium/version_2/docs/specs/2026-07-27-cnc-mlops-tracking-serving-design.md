@@ -74,9 +74,12 @@ with mlflow.start_run():
             f"{method}_fn": r["fn"], f"{method}_tn": r["tn"],
         })
     mlflow.pytorch.log_model(
-        summary["model"], artifact_path="model", registered_model_name="cnc-lstm-ae"
+        summary["model"], artifact_path="model", registered_model_name="cnc-lstm-ae",
+        serialization_format="pickle",
     )
 ```
+
+`serialization_format="pickle"`은 필수다 — mlflow 최신 버전의 기본값(`pt2`, `torch.export` 기반 그래프 트레이싱)은 `nn.LSTM`을 포함한 모델에서 `Constraints violated (dynamic_dim)` 오류로 실패함을 스파이크로 확인했다(cuDNN 기반 LSTM 구현이 `torch.export`로 완전히 트레이싱되지 않는 것으로 보임). `pickle` 포맷은 트레이싱 없이 객체를 그대로 직렬화하므로 문제없이 동작한다.
 
 - split 정보(`train_experiment_ids` 등)는 `data/processed/manifest.json`에서 읽어 params로 남긴다 — "이 모델이 어떤 실험 구성으로 학습됐는지"가 리키지 수정 전/후를 구분하는 핵심 정보이기 때문.
 - git commit hash는 MLflow가 git 저장소 안에서 실행되면 자동으로 태그(`mlflow.source.git.commit`)로 남기므로 별도 코드 불필요.
