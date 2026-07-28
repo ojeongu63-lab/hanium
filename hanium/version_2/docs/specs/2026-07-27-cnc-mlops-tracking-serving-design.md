@@ -111,7 +111,7 @@ version_2/src/serving/
 FastAPI `lifespan`에서:
 1. `mlflow.pytorch.load_model("models:/cnc-lstm-ae@champion")`로 모델 로드.
 2. 같은 버전의 `run_id`로 `MlflowClient().get_run(run_id).data.metrics`를 조회해 `{method}_threshold` 3종을 가져온다 — threshold를 로컬 파일이 아니라 MLflow에서 가져오게 해, "서빙 중인 모델과 그 threshold가 항상 같은 run에서 나온다"는 일관성을 보장한다.
-3. champion alias가 아직 없으면(최초 배포 전) 기동을 실패시키고 `promote_model.py`를 먼저 실행하라는 에러 메시지를 낸다.
+3. champion alias가 아직 없으면(최초 배포 전) 또는 로드 중 에러가 나면, 기동을 실패시키지 않고 에러를 로그로 남긴 뒤 모델 미로딩 상태로 서버를 그대로 기동한다. 이 상태에서는 `GET /health`, `POST /predict`가 503을 반환하며, `scripts/promote_model.py`를 실행해 champion을 지정하면 다음 기동부터 정상 로드된다.
 
 `scaler.json`(전처리 산출물)은 지금처럼 `data/processed/scaler.json`을 직접 읽는다 — 전처리는 이 스펙의 추적 대상이 아니고(전처리 자체가 자주 바뀌지 않음), 매 학습마다 이 파일이 달라지지 않으므로 MLflow에 별도로 얹지 않는다.
 
