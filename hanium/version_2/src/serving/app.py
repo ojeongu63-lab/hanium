@@ -95,8 +95,8 @@ async def predict(
     state: ModelState = Depends(get_model_state),
 ) -> dict:
     content = await file.read()
-    df = pd.read_csv(io.BytesIO(content))
     try:
+        df = pd.read_csv(io.BytesIO(content))
         result = predict_experiment(
             df=df,
             model=state.model,

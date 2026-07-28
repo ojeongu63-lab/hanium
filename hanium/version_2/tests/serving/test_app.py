@@ -102,3 +102,16 @@ def test_predict_returns_400_for_missing_columns():
     assert response.status_code == 400
     assert "missing required columns" in response.json()["detail"]
     app.dependency_overrides.clear()
+
+
+def test_predict_returns_400_for_empty_file():
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    response = client.post(
+        "/predict",
+        files={"file": ("empty.csv", io.BytesIO(b""), "text/csv")},
+    )
+
+    assert response.status_code == 400
+    app.dependency_overrides.clear()
