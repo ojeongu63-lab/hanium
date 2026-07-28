@@ -15,7 +15,7 @@ from .sequencing import make_eval_windows, make_train_windows
 from .training import train_autoencoder
 
 
-def _compute_window_errors(model: torch.nn.Module, windows: np.ndarray) -> np.ndarray:
+def compute_window_errors(model: torch.nn.Module, windows: np.ndarray) -> np.ndarray:
     model.eval()
     with torch.no_grad():
         x = torch.tensor(windows, dtype=torch.float32)
@@ -57,8 +57,8 @@ def run_lstm_pipeline(
         model, train_windows, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate
     )
 
-    train_window_errors = _compute_window_errors(model, train_windows)
-    eval_window_errors = _compute_window_errors(model, eval_windows)
+    train_window_errors = compute_window_errors(model, train_windows)
+    eval_window_errors = compute_window_errors(model, eval_windows)
 
     train_experiment_scores = aggregate_window_errors_by_experiment(
         train_window_errors, train_experiment_ids
