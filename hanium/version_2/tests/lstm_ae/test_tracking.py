@@ -1,12 +1,15 @@
 import json
 
 import mlflow
+import mlflow.pytorch
+import torch.nn as nn
 
 from lstm_ae.tracking import (
     EXPERIMENT_NAME,
     build_run_metrics,
     build_run_params,
     configure_tracking,
+    promote_to_champion,
 )
 
 
@@ -62,3 +65,29 @@ def test_build_run_metrics_flattens_thresholds_and_results():
     assert metrics["max_fp"] == 2
     assert metrics["p95_tn"] == 2
     assert len(metrics) == 3 * 7
+
+
+def test_promote_to_champion_sets_alias(tmp_path):
+    configure_tracking(tmp_path)
+
+    class Tiny(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(2, 2)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    with mlflow.start_run():
+        result = mlflow.pytorch.log_model(
+            Tiny(),
+            artifact_path="model",
+            registered_model_name="cnc-lstm-ae",
+            serialization_format="pickle",
+        )
+
+    promote_to_champion(result.registered_model_version, tmp_path)
+
+    client = mlflow.tracking.MlflowClient()
+    mv = client.get_model_version_by_alias("cnc-lstm-ae", "champion")
+    assert mv.version == result.registered_model_version

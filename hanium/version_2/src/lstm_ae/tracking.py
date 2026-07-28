@@ -45,3 +45,9 @@ def build_run_metrics(thresholds: dict, results: dict) -> dict:
         metrics[f"{method}_fn"] = r["fn"]
         metrics[f"{method}_tn"] = r["tn"]
     return metrics
+
+
+def promote_to_champion(version: str, mlflow_dir: Path = MLFLOW_DIR) -> None:
+    configure_tracking(mlflow_dir)
+    client = MlflowClient()
+    client.set_registered_model_alias(REGISTERED_MODEL_NAME, CHAMPION_ALIAS, version)
