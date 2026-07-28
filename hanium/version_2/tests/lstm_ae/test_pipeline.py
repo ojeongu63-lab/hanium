@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 
 from lstm_ae.pipeline import run_lstm_pipeline
+from lstm_ae.model import LSTMAutoencoder
 
 FEATURE_COLUMNS = ["f0", "f1", "f2"]
 
@@ -88,3 +89,4 @@ def test_run_lstm_pipeline_creates_expected_output_files(tmp_path):
     assert "train_windows" in summary
     assert summary["train_windows"] == 10
     assert summary["eval_windows"] == 30
+    assert isinstance(summary["model"], LSTMAutoencoder)

@@ -110,6 +110,7 @@ def run_lstm_pipeline(
     )
 
     return {
+        "model": model,
         "train_windows": len(train_windows),
         "eval_windows": len(eval_windows),
         "final_train_loss": loss_history[-1],
