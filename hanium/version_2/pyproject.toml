@@ -8,9 +8,9 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.140.7",
-    "mlflow>=3",
+    "mlflow>=3.14",
     "numpy>=2.5.1",
-    "pandas",
+    "pandas<3",  # mlflow 3.x requires pandas<3
     "python-multipart>=0.0.32",
     "scikit-learn>=1.9.0",
     "torch>=2.13.0",

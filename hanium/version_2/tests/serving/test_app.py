@@ -2,6 +2,7 @@ import io
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -9,6 +10,12 @@ from fastapi.testclient import TestClient
 from lstm_ae.model import LSTMAutoencoder
 from preprocessing.columns import FEATURE_COLUMNS
 from serving.app import ModelState, app, get_model_state
+
+
+@pytest.fixture(autouse=True)
+def _clear_overrides():
+    yield
+    app.dependency_overrides.clear()
 
 
 def _fake_state(window_size: int = 6, threshold: float = 1.0) -> ModelState:
@@ -40,7 +47,6 @@ def test_health_returns_model_version_when_loaded():
     assert response.json() == {
         "status": "ok", "model_version": "1", "mlflow_run_id": "fake-run-id",
     }
-    app.dependency_overrides.clear()
 
 
 def test_health_returns_503_when_not_loaded():
@@ -53,7 +59,6 @@ def test_health_returns_503_when_not_loaded():
     response = client.get("/health")
 
     assert response.status_code == 503
-    app.dependency_overrides.clear()
 
 
 def test_predict_returns_prediction_for_valid_csv():
@@ -72,7 +77,6 @@ def test_predict_returns_prediction_for_valid_csv():
     assert body["predicted_label"] in (0, 1)
     assert body["model_version"] == "1"
     assert body["mlflow_run_id"] == "fake-run-id"
-    app.dependency_overrides.clear()
 
 
 def test_predict_returns_400_for_too_short_experiment():
@@ -86,7 +90,6 @@ def test_predict_returns_400_for_too_short_experiment():
 
     assert response.status_code == 400
     assert "needs at least" in response.json()["detail"]
-    app.dependency_overrides.clear()
 
 
 def test_predict_returns_400_for_missing_columns():
@@ -101,7 +104,6 @@ def test_predict_returns_400_for_missing_columns():
 
     assert response.status_code == 400
     assert "missing required columns" in response.json()["detail"]
-    app.dependency_overrides.clear()
 
 
 def test_predict_returns_400_for_empty_file():
@@ -114,4 +116,3 @@ def test_predict_returns_400_for_empty_file():
     )
 
     assert response.status_code == 400
-    app.dependency_overrides.clear()

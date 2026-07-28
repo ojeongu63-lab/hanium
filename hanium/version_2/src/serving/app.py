@@ -48,7 +48,7 @@ def load_model_state() -> ModelState:
         scaler_dict=scaler_dict,
         thresholds=thresholds,
         window_size=window_size,
-        model_version=mv.version,
+        model_version=str(mv.version),
         mlflow_run_id=mv.run_id,
     )
 

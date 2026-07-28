@@ -305,9 +305,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.140.7" },
-    { name = "mlflow", specifier = ">=3" },
+    { name = "mlflow", specifier = ">=3.14" },
     { name = "numpy", specifier = ">=2.5.1" },
-    { name = "pandas" },
+    { name = "pandas", specifier = "<3" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
     { name = "torch", specifier = ">=2.13.0", index = "https://download.pytorch.org/whl/cpu" },
