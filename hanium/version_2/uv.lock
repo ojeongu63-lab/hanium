@@ -286,6 +286,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "matplotlib" },
     { name = "mlflow" },
     { name = "numpy" },
     { name = "pandas" },
@@ -305,6 +306,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.140.7" },
+    { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "mlflow", specifier = ">=3.14" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "pandas", specifier = "<3" },

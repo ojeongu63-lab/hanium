@@ -1,9 +1,14 @@
 import json
 import sqlite3
+import tempfile
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import mlflow
+import pandas as pd
 from mlflow.tracking import MlflowClient
+
+from .plotting import build_confusion_matrix_figure, build_score_distribution_figure
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 MLFLOW_DIR = ROOT / "data" / "mlflow"
@@ -110,3 +115,31 @@ def promote_to_champion(version: str, mlflow_dir: Path = MLFLOW_DIR) -> None:
     configure_tracking(mlflow_dir)
     client = MlflowClient()
     client.set_registered_model_alias(REGISTERED_MODEL_NAME, CHAMPION_ALIAS, version)
+
+
+def log_evaluation_plots(
+    client: MlflowClient,
+    model_id: str,
+    results: dict,
+    thresholds: dict,
+    experiment_scores: pd.DataFrame,
+) -> None:
+    """confusion matrix/score distribution 그림을 로그된 모델의 아티팩트로 업로드한다.
+    run이 아니라 모델에 붙이는 이유: 모델이 연결된 run에서 mlflow UI의 Artifacts 탭은
+    기본적으로 run 자체의 아티팩트가 아니라 연결된 모델의 아티팩트를 보여주기 때문 —
+    run에 직접 로그하면 UI에서 안 보인다."""
+    with tempfile.TemporaryDirectory() as tmp:
+        plots_dir = Path(tmp) / "plots"
+        plots_dir.mkdir()
+        for method in results:
+            cm_fig = build_confusion_matrix_figure(results, method=method)
+            cm_fig.savefig(plots_dir / f"confusion_matrix_{method}.png", dpi=100)
+            plt.close(cm_fig)
+
+            dist_fig = build_score_distribution_figure(
+                experiment_scores, threshold=thresholds[method], method=method
+            )
+            dist_fig.savefig(plots_dir / f"score_distribution_{method}.png", dpi=100)
+            plt.close(dist_fig)
+
+        client.log_model_artifacts(model_id, tmp)

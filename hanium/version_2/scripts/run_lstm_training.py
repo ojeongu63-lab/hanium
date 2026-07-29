@@ -3,6 +3,8 @@ from pathlib import Path
 
 import mlflow
 import mlflow.pytorch
+import pandas as pd
+from mlflow.tracking import MlflowClient
 
 from lstm_ae.pipeline import run_lstm_pipeline
 from lstm_ae.tracking import (
@@ -10,6 +12,7 @@ from lstm_ae.tracking import (
     build_run_metrics,
     build_run_params,
     configure_tracking,
+    log_evaluation_plots,
 )
 from preprocessing.columns import FEATURE_COLUMNS
 
@@ -44,11 +47,20 @@ def main() -> None:
 
         mlflow.log_metrics(build_run_metrics(summary["thresholds"], summary["results"]))
 
-        mlflow.pytorch.log_model(
+        model_info = mlflow.pytorch.log_model(
             summary["model"],
             artifact_path="model",
             registered_model_name=REGISTERED_MODEL_NAME,
             serialization_format="pickle",
+        )
+
+        experiment_scores = pd.read_csv(ROOT / "data" / "model" / "experiment_scores.csv")
+        log_evaluation_plots(
+            MlflowClient(),
+            model_info.model_id,
+            summary["results"],
+            summary["thresholds"],
+            experiment_scores,
         )
 
     print(f"train_windows: {summary['train_windows']}")

@@ -4,7 +4,9 @@ import sqlite3
 
 import mlflow
 import mlflow.pytorch
+import pandas as pd
 import torch.nn as nn
+from mlflow.tracking import MlflowClient
 
 from lstm_ae.tracking import (
     CHAMPION_ALIAS,
@@ -13,6 +15,7 @@ from lstm_ae.tracking import (
     build_run_metrics,
     build_run_params,
     configure_tracking,
+    log_evaluation_plots,
     promote_to_champion,
 )
 
@@ -140,3 +143,37 @@ def test_configure_tracking_repairs_paths_copied_from_another_machine(tmp_path):
 
     loaded = mlflow.pytorch.load_model(f"models:/{REGISTERED_MODEL_NAME}@{CHAMPION_ALIAS}")
     assert isinstance(loaded, Tiny)
+
+
+def test_log_evaluation_plots_attaches_plots_to_logged_model(tmp_path):
+    configure_tracking(tmp_path)
+
+    class Tiny(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(2, 2)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    with mlflow.start_run():
+        model_info = mlflow.pytorch.log_model(
+            Tiny(),
+            artifact_path="model",
+            registered_model_name=REGISTERED_MODEL_NAME,
+            serialization_format="pickle",
+        )
+
+    results = {"mean": {"tp": 5, "fp": 1, "fn": 1, "tn": 2}}
+    thresholds = {"mean": 0.5}
+    experiment_scores = pd.DataFrame({
+        "experiment_id": [1, 2],
+        "mean_score": [0.2, 0.8],
+        "label": [0, 1],
+    })
+
+    client = MlflowClient()
+    log_evaluation_plots(client, model_info.model_id, results, thresholds, experiment_scores)
+
+    artifacts = {a.path for a in client.list_logged_model_artifacts(model_info.model_id, "plots")}
+    assert artifacts == {"plots/confusion_matrix_mean.png", "plots/score_distribution_mean.png"}
