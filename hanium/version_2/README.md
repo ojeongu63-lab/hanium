@@ -62,7 +62,8 @@ nice -n 19 uv run uvicorn serving.app:app --port 8899
 
 - Swagger UI: `http://127.0.0.1:8899/docs`
 - `/health`: 현재 로드된 champion 모델 버전 확인
-- `/predict`: 실험 CSV 업로드 → 양품/불량 판정
+- `/predict`: 실험 CSV 업로드 → 양품/불량 판정 + 피처별 재구성오차 기여도(`feature_contributions`,
+  오차 큰 순 정렬) — 어떤 변수가 이상 판정에 가장 크게 기여했는지 확인 가능
 
 테스트용 실험 CSV 경로 (경로에 공백 있으니 항상 따옴표):
 

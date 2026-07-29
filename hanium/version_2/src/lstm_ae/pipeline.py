@@ -15,13 +15,26 @@ from .sequencing import make_eval_windows, make_train_windows
 from .training import train_autoencoder
 
 
-def compute_window_errors(model: torch.nn.Module, windows: np.ndarray) -> np.ndarray:
+def _reconstruct(model: torch.nn.Module, windows: np.ndarray) -> np.ndarray:
     model.eval()
     with torch.no_grad():
         x = torch.tensor(windows, dtype=torch.float32)
-        reconstructed = model(x).numpy()
+        return model(x).numpy()
+
+
+def compute_window_errors(model: torch.nn.Module, windows: np.ndarray) -> np.ndarray:
+    reconstructed = _reconstruct(model, windows)
     squared_errors = (reconstructed - windows) ** 2
     return squared_errors.reshape(len(windows), -1).mean(axis=1)
+
+
+def compute_feature_errors(model: torch.nn.Module, windows: np.ndarray) -> np.ndarray:
+    """윈도우별 재구성오차를 시간축만 평균 내 피처축은 남긴다. shape: (n_windows, n_features).
+    compute_window_errors가 피처+시간을 전부 뭉개 스칼라로 만드는 것과 같은 재구성값을 쓰되,
+    어떤 피처가 오차에 가장 크게 기여했는지 보기 위해 피처별로 분리해둔다."""
+    reconstructed = _reconstruct(model, windows)
+    squared_errors = (reconstructed - windows) ** 2
+    return squared_errors.mean(axis=1)
 
 
 def run_lstm_pipeline(

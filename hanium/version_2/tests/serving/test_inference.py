@@ -6,6 +6,7 @@ import torch
 from lstm_ae.model import LSTMAutoencoder
 from serving.inference import (
     predict_experiment,
+    rank_feature_contributions,
     scale_features,
     score_to_label,
     validate_columns,
@@ -85,9 +86,25 @@ def test_predict_experiment_returns_expected_shape():
 
     assert set(result.keys()) == {
         "predicted_label", "predicted_label_text", "score", "threshold", "method",
+        "feature_contributions",
     }
     assert result["predicted_label"] in (0, 1)
     assert result["predicted_label_text"] in ("good", "bad")
     assert result["method"] == "mean"
     assert result["threshold"] == 1.0
     assert (result["predicted_label"] == 1) == (result["score"] > 1.0)
+
+    contributions = result["feature_contributions"]
+    assert {c["feature"] for c in contributions} == set(FEATURE_COLUMNS)
+    errors = [c["error"] for c in contributions]
+    assert errors == sorted(errors, reverse=True)
+
+
+def test_rank_feature_contributions_sorts_descending_by_error():
+    result = rank_feature_contributions(
+        feature_errors=np.array([0.1, 0.5, 0.3]), feature_columns=["f0", "f1", "f2"]
+    )
+
+    assert [r["feature"] for r in result] == ["f1", "f2", "f0"]
+    assert result[0]["error"] == pytest.approx(0.5)
+    assert result[-1]["error"] == pytest.approx(0.1)

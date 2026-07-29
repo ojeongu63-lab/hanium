@@ -1,7 +1,8 @@
+import numpy as np
 import pandas as pd
 import torch
 
-from lstm_ae.pipeline import compute_window_errors
+from lstm_ae.pipeline import compute_feature_errors, compute_window_errors
 from lstm_ae.scoring import aggregate_window_errors_by_experiment
 from lstm_ae.sequencing import make_eval_windows
 
@@ -27,6 +28,17 @@ def score_to_label(score: float, threshold: float) -> tuple[int, str]:
     if score > threshold:
         return 1, "bad"
     return 0, "good"
+
+
+def rank_feature_contributions(
+    feature_errors: np.ndarray, feature_columns: list[str]
+) -> list[dict]:
+    return [
+        {"feature": col, "error": float(err)}
+        for col, err in sorted(
+            zip(feature_columns, feature_errors), key=lambda pair: pair[1], reverse=True
+        )
+    ]
 
 
 def predict_experiment(
@@ -58,10 +70,14 @@ def predict_experiment(
     score = float(experiment_scores.loc[0, f"{method}_score"])
     predicted_label, predicted_label_text = score_to_label(score, threshold)
 
+    feature_errors = compute_feature_errors(model, windows).mean(axis=0)
+    feature_contributions = rank_feature_contributions(feature_errors, feature_columns)
+
     return {
         "predicted_label": predicted_label,
         "predicted_label_text": predicted_label_text,
         "score": score,
         "threshold": threshold,
         "method": method,
+        "feature_contributions": feature_contributions,
     }

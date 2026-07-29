@@ -77,6 +77,7 @@ def test_predict_returns_prediction_for_valid_csv():
     assert body["predicted_label"] in (0, 1)
     assert body["model_version"] == "1"
     assert body["mlflow_run_id"] == "fake-run-id"
+    assert {c["feature"] for c in body["feature_contributions"]} == set(FEATURE_COLUMNS)
 
 
 def test_predict_returns_400_for_too_short_experiment():

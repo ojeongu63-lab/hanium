@@ -4,10 +4,22 @@ import numpy as np
 import pandas as pd
 import torch
 
-from lstm_ae.pipeline import run_lstm_pipeline
+from lstm_ae.pipeline import compute_feature_errors, compute_window_errors, run_lstm_pipeline
 from lstm_ae.model import LSTMAutoencoder
 
 FEATURE_COLUMNS = ["f0", "f1", "f2"]
+
+
+def test_compute_feature_errors_matches_window_errors_when_averaged():
+    torch.manual_seed(0)
+    model = LSTMAutoencoder(num_features=3, hidden_size=4, latent_dim=2)
+    windows = np.random.randn(5, 6, 3).astype(np.float32)
+
+    window_errors = compute_window_errors(model, windows)
+    feature_errors = compute_feature_errors(model, windows)
+
+    assert feature_errors.shape == (5, 3)
+    np.testing.assert_allclose(feature_errors.mean(axis=1), window_errors, rtol=1e-5)
 
 
 def _make_train_csv(path):
