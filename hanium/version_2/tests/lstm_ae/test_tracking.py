@@ -1,11 +1,15 @@
 import json
+import shutil
+import sqlite3
 
 import mlflow
 import mlflow.pytorch
 import torch.nn as nn
 
 from lstm_ae.tracking import (
+    CHAMPION_ALIAS,
     EXPERIMENT_NAME,
+    REGISTERED_MODEL_NAME,
     build_run_metrics,
     build_run_params,
     configure_tracking,
@@ -91,3 +95,48 @@ def test_promote_to_champion_sets_alias(tmp_path):
     client = mlflow.tracking.MlflowClient()
     mv = client.get_model_version_by_alias("cnc-lstm-ae", "champion")
     assert mv.version == result.registered_model_version
+
+
+def test_configure_tracking_repairs_paths_copied_from_another_machine(tmp_path):
+    old_dir = tmp_path / "old"
+    new_dir = tmp_path / "new"
+    configure_tracking(old_dir)
+
+    class Tiny(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(2, 2)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    with mlflow.start_run():
+        result = mlflow.pytorch.log_model(
+            Tiny(),
+            artifact_path="model",
+            registered_model_name=REGISTERED_MODEL_NAME,
+            serialization_format="pickle",
+        )
+    promote_to_champion(result.registered_model_version, old_dir)
+
+    shutil.copytree(old_dir, new_dir)
+
+    conn = sqlite3.connect(new_dir / "mlflow.db")
+    stale_before = conn.execute(
+        "SELECT artifact_location FROM experiments WHERE name = ?", (EXPERIMENT_NAME,)
+    ).fetchone()[0]
+    conn.close()
+    assert str(old_dir.resolve()) in stale_before
+
+    configure_tracking(new_dir)
+
+    conn = sqlite3.connect(new_dir / "mlflow.db")
+    fixed = conn.execute(
+        "SELECT artifact_location FROM experiments WHERE name = ?", (EXPERIMENT_NAME,)
+    ).fetchone()[0]
+    conn.close()
+    assert str(old_dir.resolve()) not in fixed
+    assert fixed == f"file://{new_dir.resolve().as_posix()}/artifacts"
+
+    loaded = mlflow.pytorch.load_model(f"models:/{REGISTERED_MODEL_NAME}@{CHAMPION_ALIAS}")
+    assert isinstance(loaded, Tiny)
