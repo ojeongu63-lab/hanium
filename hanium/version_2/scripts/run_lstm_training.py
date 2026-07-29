@@ -14,7 +14,7 @@ from lstm_ae.tracking import (
     configure_tracking,
     log_evaluation_plots,
 )
-from preprocessing.columns import FEATURE_COLUMNS
+from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -42,6 +42,7 @@ def main() -> None:
             eval_csv_path=str(ROOT / "data" / "processed" / "eval.csv"),
             feature_columns=FEATURE_COLUMNS,
             output_dir=str(ROOT / "data" / "model"),
+            exclude_from_ranking=SETUP_CONSTANT_COLUMNS,
             **TRAINING_CONFIG,
         )
 
@@ -55,12 +56,26 @@ def main() -> None:
         )
 
         experiment_scores = pd.read_csv(ROOT / "data" / "model" / "experiment_scores.csv")
+        feature_error_scores = pd.read_csv(ROOT / "data" / "model" / "eval_feature_errors.csv")
+        feature_baseline = json.loads(
+            (ROOT / "data" / "model" / "feature_baseline.json").read_text()
+        )
+        timeline_errors = pd.read_csv(ROOT / "data" / "model" / "eval_timeline_errors.csv")
+        reconstruction_overlay = pd.read_csv(
+            ROOT / "data" / "model" / "eval_reconstruction_overlay.csv"
+        )
+        rankable_columns = [c for c in FEATURE_COLUMNS if c not in SETUP_CONSTANT_COLUMNS]
         log_evaluation_plots(
             MlflowClient(),
             model_info.model_id,
             summary["results"],
             summary["thresholds"],
             experiment_scores,
+            feature_error_scores,
+            rankable_columns,
+            feature_baseline,
+            timeline_errors,
+            reconstruction_overlay,
         )
 
     print(f"train_windows: {summary['train_windows']}")

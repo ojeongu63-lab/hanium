@@ -13,6 +13,14 @@ METADATA_EXCLUDED_COLUMNS = [
     "Machining_Process",
 ]
 
+SETUP_CONSTANT_COLUMNS = [
+    # 실험(작업)마다 하나의 상수값만 갖는 셋업 변수 — 공구/공작물 조합에 따른 토크 관성이라
+    # 샷 내내 변하지 않는다. 시계열 신호가 아니므로 이상 원인 랭킹(feature_contributions,
+    # 히트맵, 재구성 오버레이)에서는 제외한다 — train에 없던 조합이면 늘 크게 벗어나 보여서
+    # 진짜 공정 이상과 구분이 안 된다.
+    "S_SystemInertia",
+]
+
 FEATURE_COLUMNS = [
     "X_ActualPosition",
     "X_ActualVelocity",

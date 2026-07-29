@@ -8,7 +8,13 @@ import mlflow
 import pandas as pd
 from mlflow.tracking import MlflowClient
 
-from .plotting import build_confusion_matrix_figure, build_score_distribution_figure
+from .plotting import (
+    build_confusion_matrix_figure,
+    build_feature_contribution_heatmap_figure,
+    build_reconstruction_overlay_figure,
+    build_score_distribution_figure,
+    build_timeline_error_figure,
+)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 MLFLOW_DIR = ROOT / "data" / "mlflow"
@@ -123,11 +129,16 @@ def log_evaluation_plots(
     results: dict,
     thresholds: dict,
     experiment_scores: pd.DataFrame,
+    feature_error_scores: pd.DataFrame,
+    feature_columns: list[str],
+    feature_baseline: dict,
+    timeline_errors: pd.DataFrame,
+    reconstruction_overlay: pd.DataFrame,
 ) -> None:
-    """confusion matrix/score distribution 그림을 로그된 모델의 아티팩트로 업로드한다.
-    run이 아니라 모델에 붙이는 이유: 모델이 연결된 run에서 mlflow UI의 Artifacts 탭은
-    기본적으로 run 자체의 아티팩트가 아니라 연결된 모델의 아티팩트를 보여주기 때문 —
-    run에 직접 로그하면 UI에서 안 보인다."""
+    """confusion matrix/score distribution/feature contribution heatmap 그림을 로그된
+    모델의 아티팩트로 업로드한다. run이 아니라 모델에 붙이는 이유: 모델이 연결된 run에서
+    mlflow UI의 Artifacts 탭은 기본적으로 run 자체의 아티팩트가 아니라 연결된 모델의
+    아티팩트를 보여주기 때문 — run에 직접 로그하면 UI에서 안 보인다."""
     with tempfile.TemporaryDirectory() as tmp:
         plots_dir = Path(tmp) / "plots"
         plots_dir.mkdir()
@@ -141,5 +152,22 @@ def log_evaluation_plots(
             )
             dist_fig.savefig(plots_dir / f"score_distribution_{method}.png", dpi=100)
             plt.close(dist_fig)
+
+            heatmap_fig = build_feature_contribution_heatmap_figure(
+                feature_error_scores, experiment_scores, feature_columns, feature_baseline,
+                method=method,
+            )
+            heatmap_fig.savefig(plots_dir / f"feature_contribution_heatmap_{method}.png", dpi=100)
+            plt.close(heatmap_fig)
+
+            timeline_fig = build_timeline_error_figure(
+                timeline_errors, experiment_scores, threshold=thresholds[method], method=method
+            )
+            timeline_fig.savefig(plots_dir / f"timeline_error_{method}.png", dpi=100)
+            plt.close(timeline_fig)
+
+        overlay_fig = build_reconstruction_overlay_figure(reconstruction_overlay, experiment_scores)
+        overlay_fig.savefig(plots_dir / "reconstruction_overlay.png", dpi=100)
+        plt.close(overlay_fig)
 
         client.log_model_artifacts(model_id, tmp)

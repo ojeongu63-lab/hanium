@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from mlflow.tracking import MlflowClient
 
 from lstm_ae.tracking import CHAMPION_ALIAS, REGISTERED_MODEL_NAME, configure_tracking
-from preprocessing.columns import FEATURE_COLUMNS
+from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 from serving.inference import predict_experiment
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -27,6 +27,7 @@ class ModelState:
     window_size: int
     model_version: str
     mlflow_run_id: str
+    feature_baseline: dict
 
 
 _state: ModelState | None = None
@@ -43,6 +44,7 @@ def load_model_state() -> ModelState:
     }
     window_size = int(run.data.params["window_size"])
     scaler_dict = json.loads((ROOT / "data" / "processed" / "scaler.json").read_text())
+    feature_baseline = json.loads((ROOT / "data" / "model" / "feature_baseline.json").read_text())
     return ModelState(
         model=model,
         scaler_dict=scaler_dict,
@@ -50,6 +52,7 @@ def load_model_state() -> ModelState:
         window_size=window_size,
         model_version=str(mv.version),
         mlflow_run_id=mv.run_id,
+        feature_baseline=feature_baseline,
     )
 
 
@@ -105,6 +108,8 @@ async def predict(
             window_size=state.window_size,
             threshold=state.thresholds[method],
             method=method,
+            feature_baseline=state.feature_baseline,
+            exclude_from_ranking=SETUP_CONSTANT_COLUMNS,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

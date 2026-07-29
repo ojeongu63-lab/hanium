@@ -170,10 +170,50 @@ def test_log_evaluation_plots_attaches_plots_to_logged_model(tmp_path):
         "experiment_id": [1, 2],
         "mean_score": [0.2, 0.8],
         "label": [0, 1],
+        "mean_exceeds_threshold": [False, True],
+    })
+    feature_columns = ["f0", "f1"]
+    feature_error_scores = pd.DataFrame({
+        "experiment_id": [1, 2],
+        "f0": [0.1, 0.6],
+        "f1": [0.2, 0.7],
+    })
+    feature_baseline = {
+        "mean": {"f0": 0.1, "f1": 0.2},
+        "std": {"f0": 0.05, "f1": 0.05},
+    }
+    timeline_errors = pd.DataFrame({
+        "experiment_id": [1, 1, 2, 2],
+        "timestep": [0, 1, 0, 1],
+        "error": [0.1, 0.15, 0.6, 0.7],
+    })
+    reconstruction_overlay = pd.DataFrame({
+        "experiment_id": [1, 1, 2, 2],
+        "feature": ["f0", "f0", "f1", "f1"],
+        "timestep": [0, 1, 0, 1],
+        "actual": [0.1, 0.15, 0.6, 0.7],
+        "reconstructed": [0.12, 0.14, 0.55, 0.65],
     })
 
     client = MlflowClient()
-    log_evaluation_plots(client, model_info.model_id, results, thresholds, experiment_scores)
+    log_evaluation_plots(
+        client,
+        model_info.model_id,
+        results,
+        thresholds,
+        experiment_scores,
+        feature_error_scores,
+        feature_columns,
+        feature_baseline,
+        timeline_errors,
+        reconstruction_overlay,
+    )
 
     artifacts = {a.path for a in client.list_logged_model_artifacts(model_info.model_id, "plots")}
-    assert artifacts == {"plots/confusion_matrix_mean.png", "plots/score_distribution_mean.png"}
+    assert artifacts == {
+        "plots/confusion_matrix_mean.png",
+        "plots/score_distribution_mean.png",
+        "plots/feature_contribution_heatmap_mean.png",
+        "plots/timeline_error_mean.png",
+        "plots/reconstruction_overlay.png",
+    }

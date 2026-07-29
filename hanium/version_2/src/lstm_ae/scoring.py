@@ -15,6 +15,14 @@ def aggregate_window_errors_by_experiment(
     return result.reset_index()
 
 
+def aggregate_feature_errors_by_experiment(
+    feature_errors: np.ndarray, experiment_ids: np.ndarray, feature_columns: list[str]
+) -> pd.DataFrame:
+    df = pd.DataFrame(feature_errors, columns=feature_columns)
+    df["experiment_id"] = experiment_ids
+    return df.groupby("experiment_id")[feature_columns].mean().reset_index()
+
+
 def compute_thresholds(
     train_experiment_scores: pd.DataFrame, percentile: float = 95.0
 ) -> dict:

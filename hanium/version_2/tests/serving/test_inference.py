@@ -19,6 +19,13 @@ def _scaler_dict():
     return {col: {"mean": 0.0, "std": 1.0} for col in FEATURE_COLUMNS}
 
 
+def _feature_baseline():
+    return {
+        "mean": {col: 0.5 for col in FEATURE_COLUMNS},
+        "std": {col: 0.1 for col in FEATURE_COLUMNS},
+    }
+
+
 def _raw_df(rows: int) -> pd.DataFrame:
     data = {col: np.random.randn(rows).astype(np.float32) for col in FEATURE_COLUMNS}
     return pd.DataFrame(data)
@@ -60,6 +67,7 @@ def test_predict_experiment_raises_on_missing_columns():
         predict_experiment(
             df=df, model=model, feature_columns=FEATURE_COLUMNS,
             scaler_dict=_scaler_dict(), window_size=6, threshold=1.0, method="mean",
+            feature_baseline=_feature_baseline(),
         )
 
 
@@ -70,6 +78,7 @@ def test_predict_experiment_raises_on_too_short_experiment():
         predict_experiment(
             df=df, model=model, feature_columns=FEATURE_COLUMNS,
             scaler_dict=_scaler_dict(), window_size=6, threshold=1.0, method="mean",
+            feature_baseline=_feature_baseline(),
         )
 
 
@@ -82,6 +91,7 @@ def test_predict_experiment_returns_expected_shape():
     result = predict_experiment(
         df=df, model=model, feature_columns=FEATURE_COLUMNS,
         scaler_dict=_scaler_dict(), window_size=6, threshold=1.0, method="mean",
+        feature_baseline=_feature_baseline(),
     )
 
     assert set(result.keys()) == {
@@ -96,15 +106,51 @@ def test_predict_experiment_returns_expected_shape():
 
     contributions = result["feature_contributions"]
     assert {c["feature"] for c in contributions} == set(FEATURE_COLUMNS)
-    errors = [c["error"] for c in contributions]
-    assert errors == sorted(errors, reverse=True)
+    z_scores = [c["z_score"] for c in contributions]
+    assert z_scores == sorted(z_scores, reverse=True)
 
 
-def test_rank_feature_contributions_sorts_descending_by_error():
+def test_predict_experiment_forwards_exclude_from_ranking():
+    torch.manual_seed(0)
+    np.random.seed(0)
+    df = _raw_df(20)
+    model = LSTMAutoencoder(num_features=3, hidden_size=4, latent_dim=2)
+
+    result = predict_experiment(
+        df=df, model=model, feature_columns=FEATURE_COLUMNS,
+        scaler_dict=_scaler_dict(), window_size=6, threshold=1.0, method="mean",
+        feature_baseline=_feature_baseline(), exclude_from_ranking=["f1"],
+    )
+
+    assert {c["feature"] for c in result["feature_contributions"]} == {"f0", "f2"}
+
+
+def test_rank_feature_contributions_sorts_descending_by_z_score():
+    # baseline mean=0.5,std=0.1 for all three -> z-scores: f0=-4, f1=0, f2=-2
     result = rank_feature_contributions(
-        feature_errors=np.array([0.1, 0.5, 0.3]), feature_columns=["f0", "f1", "f2"]
+        feature_errors=np.array([0.1, 0.5, 0.3]),
+        feature_columns=["f0", "f1", "f2"],
+        feature_baseline={
+            "mean": {"f0": 0.5, "f1": 0.5, "f2": 0.5},
+            "std": {"f0": 0.1, "f1": 0.1, "f2": 0.1},
+        },
     )
 
     assert [r["feature"] for r in result] == ["f1", "f2", "f0"]
+    assert result[0]["z_score"] == pytest.approx(0.0)
+    assert result[-1]["z_score"] == pytest.approx(-4.0)
     assert result[0]["error"] == pytest.approx(0.5)
-    assert result[-1]["error"] == pytest.approx(0.1)
+
+
+def test_rank_feature_contributions_excludes_given_columns():
+    result = rank_feature_contributions(
+        feature_errors=np.array([0.1, 0.5, 0.3]),
+        feature_columns=["f0", "f1", "f2"],
+        feature_baseline={
+            "mean": {"f0": 0.5, "f1": 0.5, "f2": 0.5},
+            "std": {"f0": 0.1, "f1": 0.1, "f2": 0.1},
+        },
+        exclude_from_ranking=["f1"],
+    )
+
+    assert {r["feature"] for r in result} == {"f0", "f2"}

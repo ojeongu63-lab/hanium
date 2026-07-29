@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from lstm_ae.model import LSTMAutoencoder
-from preprocessing.columns import FEATURE_COLUMNS
+from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 from serving.app import ModelState, app, get_model_state
 
 
@@ -22,6 +22,10 @@ def _fake_state(window_size: int = 6, threshold: float = 1.0) -> ModelState:
     torch.manual_seed(0)
     model = LSTMAutoencoder(num_features=len(FEATURE_COLUMNS), hidden_size=4, latent_dim=2)
     scaler_dict = {col: {"mean": 0.0, "std": 1.0} for col in FEATURE_COLUMNS}
+    feature_baseline = {
+        "mean": {col: 0.5 for col in FEATURE_COLUMNS},
+        "std": {col: 0.1 for col in FEATURE_COLUMNS},
+    }
     return ModelState(
         model=model,
         scaler_dict=scaler_dict,
@@ -29,6 +33,7 @@ def _fake_state(window_size: int = 6, threshold: float = 1.0) -> ModelState:
         window_size=window_size,
         model_version="1",
         mlflow_run_id="fake-run-id",
+        feature_baseline=feature_baseline,
     )
 
 
@@ -77,7 +82,10 @@ def test_predict_returns_prediction_for_valid_csv():
     assert body["predicted_label"] in (0, 1)
     assert body["model_version"] == "1"
     assert body["mlflow_run_id"] == "fake-run-id"
-    assert {c["feature"] for c in body["feature_contributions"]} == set(FEATURE_COLUMNS)
+    assert {c["feature"] for c in body["feature_contributions"]} == (
+        set(FEATURE_COLUMNS) - set(SETUP_CONSTANT_COLUMNS)
+    )
+    assert all("z_score" in c for c in body["feature_contributions"])
 
 
 def test_predict_returns_400_for_too_short_experiment():

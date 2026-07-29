@@ -31,14 +31,24 @@ def score_to_label(score: float, threshold: float) -> tuple[int, str]:
 
 
 def rank_feature_contributions(
-    feature_errors: np.ndarray, feature_columns: list[str]
+    feature_errors: np.ndarray,
+    feature_columns: list[str],
+    feature_baseline: dict,
+    exclude_from_ranking: list[str] | None = None,
 ) -> list[dict]:
-    return [
-        {"feature": col, "error": float(err)}
-        for col, err in sorted(
-            zip(feature_columns, feature_errors), key=lambda pair: pair[1], reverse=True
-        )
-    ]
+    """피처별 오차를 train(정상) 기준 z-score로 정규화해 순위를 매긴다. 원본 오차 절댓값만
+    쓰면 정상 상태에서도 원래 재구성이 어려운(만성적으로 오차가 큰) 피처가 항상 상위권을
+    차지해 진짜 이상 신호를 가린다 — baseline 평균/표준편차 대비 몇 시그마 벗어났는지를 봐야
+    이 샷에서 실제로 이상해진 피처를 가려낼 수 있다. exclude_from_ranking은 실험마다
+    상수값만 갖는 셋업 변수처럼 시계열 신호가 아닌 피처를 랭킹에서 빼기 위한 것이다."""
+    exclude_from_ranking = exclude_from_ranking or []
+    contributions = []
+    for col, err in zip(feature_columns, feature_errors):
+        if col in exclude_from_ranking:
+            continue
+        z_score = (err - feature_baseline["mean"][col]) / feature_baseline["std"][col]
+        contributions.append({"feature": col, "error": float(err), "z_score": float(z_score)})
+    return sorted(contributions, key=lambda c: c["z_score"], reverse=True)
 
 
 def predict_experiment(
@@ -49,6 +59,8 @@ def predict_experiment(
     window_size: int,
     threshold: float,
     method: str,
+    feature_baseline: dict,
+    exclude_from_ranking: list[str] | None = None,
 ) -> dict:
     missing = validate_columns(df, feature_columns)
     if missing:
@@ -71,7 +83,9 @@ def predict_experiment(
     predicted_label, predicted_label_text = score_to_label(score, threshold)
 
     feature_errors = compute_feature_errors(model, windows).mean(axis=0)
-    feature_contributions = rank_feature_contributions(feature_errors, feature_columns)
+    feature_contributions = rank_feature_contributions(
+        feature_errors, feature_columns, feature_baseline, exclude_from_ranking
+    )
 
     return {
         "predicted_label": predicted_label,
