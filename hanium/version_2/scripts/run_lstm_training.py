@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import mlflow
@@ -31,6 +32,9 @@ TRAINING_CONFIG = {
 
 
 def main() -> None:
+    if len(sys.argv) > 1:
+        TRAINING_CONFIG["random_seed"] = int(sys.argv[1])
+
     configure_tracking()
     manifest = json.loads((ROOT / "data" / "processed" / "manifest.json").read_text())
 
