@@ -96,11 +96,15 @@ def test_predict_experiment_returns_expected_shape():
 
     assert set(result.keys()) == {
         "predicted_label", "predicted_label_text", "score", "threshold", "method",
-        "feature_contributions",
+        "feature_contributions", "guide",
     }
     assert result["predicted_label"] in (0, 1)
     assert result["predicted_label_text"] in ("good", "bad")
     assert result["method"] == "mean"
+    if result["predicted_label_text"] == "good":
+        assert result["guide"]["cause_estimate"] == "이상 없음"
+    else:
+        assert result["guide"] is None
     assert result["threshold"] == 1.0
     assert (result["predicted_label"] == 1) == (result["score"] > 1.0)
 
@@ -154,3 +158,21 @@ def test_rank_feature_contributions_excludes_given_columns():
     )
 
     assert {r["feature"] for r in result} == {"f0", "f2"}
+
+
+def test_predict_experiment_forwards_rag_state_for_bad_prediction():
+    torch.manual_seed(0)
+    np.random.seed(0)
+    df = _raw_df(20)
+    model = LSTMAutoencoder(num_features=3, hidden_size=4, latent_dim=2)
+
+    # threshold를 매우 낮게 잡아 무조건 bad가 나오게 강제
+    result = predict_experiment(
+        df=df, model=model, feature_columns=FEATURE_COLUMNS,
+        scaler_dict=_scaler_dict(), window_size=6, threshold=-999.0, method="mean",
+        feature_baseline=_feature_baseline(),
+        rag_corpus=None, rag_index=None, openai_client=None,
+    )
+
+    assert result["predicted_label_text"] == "bad"
+    assert result["guide"] is None  # rag_corpus 등이 없으니 None

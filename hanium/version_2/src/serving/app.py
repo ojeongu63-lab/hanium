@@ -1,16 +1,19 @@
 import io
 import json
+import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import faiss
 import mlflow
 import mlflow.pytorch
 import pandas as pd
 import torch
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from mlflow.tracking import MlflowClient
+from openai import OpenAI
 
 from lstm_ae.tracking import CHAMPION_ALIAS, REGISTERED_MODEL_NAME, configure_tracking
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
@@ -28,9 +31,26 @@ class ModelState:
     model_version: str
     mlflow_run_id: str
     feature_baseline: dict
+    rag_corpus: list[dict] | None = None
+    rag_index: object | None = None
+    openai_client: object | None = None
 
 
 _state: ModelState | None = None
+
+
+def load_rag_state() -> tuple[list[dict] | None, object | None, object | None]:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    openai_client = OpenAI(api_key=api_key) if api_key else None
+
+    corpus_path = ROOT / "data" / "rag" / "corpus.json"
+    index_path = ROOT / "data" / "rag" / "corpus.index"
+    if not corpus_path.exists() or not index_path.exists():
+        return None, None, openai_client
+
+    rag_corpus = json.loads(corpus_path.read_text())
+    rag_index = faiss.read_index(str(index_path))
+    return rag_corpus, rag_index, openai_client
 
 
 def load_model_state() -> ModelState:
@@ -45,6 +65,7 @@ def load_model_state() -> ModelState:
     window_size = int(run.data.params["window_size"])
     scaler_dict = json.loads((ROOT / "data" / "processed" / "scaler.json").read_text())
     feature_baseline = json.loads((ROOT / "data" / "model" / "feature_baseline.json").read_text())
+    rag_corpus, rag_index, openai_client = load_rag_state()
     return ModelState(
         model=model,
         scaler_dict=scaler_dict,
@@ -53,6 +74,9 @@ def load_model_state() -> ModelState:
         model_version=str(mv.version),
         mlflow_run_id=mv.run_id,
         feature_baseline=feature_baseline,
+        rag_corpus=rag_corpus,
+        rag_index=rag_index,
+        openai_client=openai_client,
     )
 
 
@@ -110,6 +134,9 @@ async def predict(
             method=method,
             feature_baseline=state.feature_baseline,
             exclude_from_ranking=SETUP_CONSTANT_COLUMNS,
+            rag_corpus=state.rag_corpus,
+            rag_index=state.rag_index,
+            openai_client=state.openai_client,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

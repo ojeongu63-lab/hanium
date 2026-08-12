@@ -125,3 +125,22 @@ def test_predict_returns_400_for_empty_file():
     )
 
     assert response.status_code == 400
+
+
+def test_predict_response_includes_guide_field():
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    response = client.post(
+        "/predict",
+        files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "guide" in body
+    if body["predicted_label_text"] == "good":
+        assert body["guide"]["cause_estimate"] == "이상 없음"
+    else:
+        assert body["guide"] is None  # _fake_state는 rag_corpus 등을 안 채움

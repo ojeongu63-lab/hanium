@@ -5,6 +5,7 @@ import torch
 from lstm_ae.pipeline import compute_feature_errors, compute_window_errors
 from lstm_ae.scoring import aggregate_window_errors_by_experiment
 from lstm_ae.sequencing import make_eval_windows
+from rag.guide import build_guide
 
 DEMO_EXPERIMENT_ID = 0
 
@@ -61,6 +62,9 @@ def predict_experiment(
     method: str,
     feature_baseline: dict,
     exclude_from_ranking: list[str] | None = None,
+    rag_corpus: list[dict] | None = None,
+    rag_index=None,
+    openai_client=None,
 ) -> dict:
     missing = validate_columns(df, feature_columns)
     if missing:
@@ -87,6 +91,18 @@ def predict_experiment(
         feature_errors, feature_columns, feature_baseline, exclude_from_ranking
     )
 
+    guide = build_guide(
+        {
+            "predicted_label_text": predicted_label_text,
+            "score": score,
+            "threshold": threshold,
+            "feature_contributions": feature_contributions,
+        },
+        rag_corpus,
+        rag_index,
+        openai_client,
+    )
+
     return {
         "predicted_label": predicted_label,
         "predicted_label_text": predicted_label_text,
@@ -94,4 +110,5 @@ def predict_experiment(
         "threshold": threshold,
         "method": method,
         "feature_contributions": feature_contributions,
+        "guide": guide,
     }
