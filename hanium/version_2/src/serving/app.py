@@ -3,6 +3,7 @@ import json
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -16,10 +17,14 @@ from mlflow.tracking import MlflowClient
 from openai import OpenAI
 
 from lstm_ae.tracking import CHAMPION_ALIAS, REGISTERED_MODEL_NAME, configure_tracking
+from monitoring.drift import compute_drift_status
+from monitoring.logging import get_recent_requests, log_request
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
-from serving.inference import predict_experiment
+from serving.inference import predict_experiment, scale_features
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+DB_PATH = ROOT / "data" / "monitoring" / "requests.db"
+DRIFT_WINDOW_SIZE = 10
 
 
 @dataclass
@@ -138,6 +143,9 @@ async def predict(
             rag_index=state.rag_index,
             openai_client=state.openai_client,
         )
+        scaled = scale_features(df, FEATURE_COLUMNS, state.scaler_dict)
+        feature_means = scaled[FEATURE_COLUMNS].mean().to_dict()
+        log_request(feature_means, result["score"], result["predicted_label_text"], DB_PATH)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
@@ -145,3 +153,12 @@ async def predict(
         "model_version": state.model_version,
         "mlflow_run_id": state.mlflow_run_id,
     }
+
+
+@app.get("/drift-status")
+def drift_status(state: ModelState = Depends(get_model_state)) -> dict:
+    recent = get_recent_requests(DRIFT_WINDOW_SIZE, DB_PATH)
+    status = compute_drift_status(
+        recent, threshold=state.thresholds["mean"], window_size=DRIFT_WINDOW_SIZE
+    )
+    return {**status, "checked_at": datetime.now(timezone.utc).isoformat()}

@@ -144,3 +144,60 @@ def test_predict_response_includes_guide_field():
         assert body["guide"]["cause_estimate"] == "이상 없음"
     else:
         assert body["guide"] is None  # _fake_state는 rag_corpus 등을 안 채움
+
+
+def test_predict_logs_request_for_drift_monitoring(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    client.post(
+        "/predict",
+        files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    )
+
+    from monitoring.logging import get_recent_requests
+    recent = get_recent_requests(10, tmp_path / "requests.db")
+    assert len(recent) == 1
+    assert set(recent[0]["feature_means"].keys()) == set(FEATURE_COLUMNS)
+
+
+def test_drift_status_reports_insufficient_data_when_log_empty(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    response = client.get("/drift-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sufficient_data"] is False
+    assert "checked_at" in body
+
+
+def test_drift_status_flags_after_enough_requests(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    monkeypatch.setattr(app_module, "DRIFT_WINDOW_SIZE", 2)
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    for _ in range(2):
+        client.post(
+            "/predict",
+            files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+        )
+
+    response = client.get("/drift-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sufficient_data"] is True
+    assert body["n_requests_logged"] == 2
