@@ -38,6 +38,7 @@ def feed_overload(df: pd.DataFrame, amplitude: float) -> pd.DataFrame:
     mask[int(n * 0.3) : int(n * 0.5)] = True
 
     for col in ["X_OutputCurrent", "X_OutputPower", "Y_OutputCurrent", "Y_OutputPower"]:
+        df[col] = df[col].astype(float)
         df.loc[mask, col] = df.loc[mask, col] * (1 + amplitude)
 
     drop = min(amplitude * 0.1, 0.5)

@@ -1,0 +1,211 @@
+{
+  "predicted_label": 0,
+  "predicted_label_text": "good",
+  "score": 0.6165890693664551,
+  "threshold": 0.8566220998764038,
+  "method": "mean",
+  "feature_contributions": [
+    {
+      "feature": "Y_DCBusVoltage",
+      "error": 0.8982567191123962,
+      "z_score": 2.1343514919281006
+    },
+    {
+      "feature": "Z_ActualAcceleration",
+      "error": 1.8385388851165771,
+      "z_score": 1.9885103702545166
+    },
+    {
+      "feature": "Z_SetAcceleration",
+      "error": 1.9427847862243652,
+      "z_score": 1.9157472848892212
+    },
+    {
+      "feature": "Z_SetVelocity",
+      "error": 1.0099475383758545,
+      "z_score": 1.5463486909866333
+    },
+    {
+      "feature": "S_SetAcceleration",
+      "error": 1.3912612199783325,
+      "z_score": 1.5077308416366577
+    },
+    {
+      "feature": "Z_ActualVelocity",
+      "error": 0.9918856024742126,
+      "z_score": 1.4301700592041016
+    },
+    {
+      "feature": "X_ActualAcceleration",
+      "error": 1.56465744972229,
+      "z_score": 0.9123875498771667
+    },
+    {
+      "feature": "Y_CurrentFeedback",
+      "error": 0.8186260461807251,
+      "z_score": 0.896054208278656
+    },
+    {
+      "feature": "X_SetAcceleration",
+      "error": 2.0427467823028564,
+      "z_score": 0.8854345083236694
+    },
+    {
+      "feature": "X_DCBusVoltage",
+      "error": 0.6464863419532776,
+      "z_score": 0.6395542025566101
+    },
+    {
+      "feature": "Y_OutputVoltage",
+      "error": 0.701850175857544,
+      "z_score": 0.4759834408760071
+    },
+    {
+      "feature": "S_ActualAcceleration",
+      "error": 1.1107158660888672,
+      "z_score": 0.4639756977558136
+    },
+    {
+      "feature": "X_OutputVoltage",
+      "error": 0.7874352335929871,
+      "z_score": 0.42888781428337097
+    },
+    {
+      "feature": "X_OutputPower",
+      "error": 0.9399508237838745,
+      "z_score": 0.33388569951057434
+    },
+    {
+      "feature": "X_ActualVelocity",
+      "error": 0.7179694175720215,
+      "z_score": 0.18193531036376953
+    },
+    {
+      "feature": "Y_SetAcceleration",
+      "error": 1.345723032951355,
+      "z_score": 0.1678239107131958
+    },
+    {
+      "feature": "X_SetVelocity",
+      "error": 0.6999263763427734,
+      "z_score": 0.14390696585178375
+    },
+    {
+      "feature": "Y_ActualVelocity",
+      "error": 0.5467248558998108,
+      "z_score": 0.12045879662036896
+    },
+    {
+      "feature": "Y_SetVelocity",
+      "error": 0.5381965041160583,
+      "z_score": 0.11588724702596664
+    },
+    {
+      "feature": "Y_OutputPower",
+      "error": 0.47711247205734253,
+      "z_score": 0.04855114221572876
+    },
+    {
+      "feature": "Y_ActualAcceleration",
+      "error": 1.0064740180969238,
+      "z_score": -0.10838060826063156
+    },
+    {
+      "feature": "X_CurrentFeedback",
+      "error": 0.6037060618400574,
+      "z_score": -0.29444441199302673
+    },
+    {
+      "feature": "S_OutputCurrent",
+      "error": 0.3400077223777771,
+      "z_score": -0.30234232544898987
+    },
+    {
+      "feature": "Y_OutputCurrent",
+      "error": 0.1604733020067215,
+      "z_score": -0.3185436725616455
+    },
+    {
+      "feature": "X_OutputCurrent",
+      "error": 0.2240554392337799,
+      "z_score": -0.45107927918434143
+    },
+    {
+      "feature": "S_DCBusVoltage",
+      "error": 0.1680484563112259,
+      "z_score": -0.5889472365379333
+    },
+    {
+      "feature": "M_CURRENT_FEEDRATE",
+      "error": 0.15692073106765747,
+      "z_score": -0.7790332436561584
+    },
+    {
+      "feature": "S_CurrentFeedback",
+      "error": 0.21886226534843445,
+      "z_score": -0.7826510667800903
+    },
+    {
+      "feature": "X_SetPosition",
+      "error": 0.1623258739709854,
+      "z_score": -0.7910973429679871
+    },
+    {
+      "feature": "X_ActualPosition",
+      "error": 0.16202518343925476,
+      "z_score": -0.8097825646400452
+    },
+    {
+      "feature": "Y_ActualPosition",
+      "error": 0.18705014884471893,
+      "z_score": -0.8339058756828308
+    },
+    {
+      "feature": "Z_SetPosition",
+      "error": 0.03105093166232109,
+      "z_score": -0.8506187796592712
+    },
+    {
+      "feature": "Z_ActualPosition",
+      "error": 0.030491769313812256,
+      "z_score": -0.8594158887863159
+    },
+    {
+      "feature": "Y_SetPosition",
+      "error": 0.18503804504871368,
+      "z_score": -0.8598002195358276
+    },
+    {
+      "feature": "S_OutputPower",
+      "error": 0.10948776453733444,
+      "z_score": -1.0940641164779663
+    },
+    {
+      "feature": "S_ActualVelocity",
+      "error": 0.030315568670630455,
+      "z_score": -1.1936945915222168
+    },
+    {
+      "feature": "S_SetVelocity",
+      "error": 0.02742641232907772,
+      "z_score": -1.2376165390014648
+    },
+    {
+      "feature": "S_OutputVoltage",
+      "error": 0.025668146088719368,
+      "z_score": -1.2527159452438354
+    },
+    {
+      "feature": "S_ActualPosition",
+      "error": 0.1646173894405365,
+      "z_score": -1.7099722623825073
+    },
+    {
+      "feature": "S_SetPosition",
+      "error": 0.163874551653862,
+      "z_score": -1.7215468883514404
+    }
+  ],
+  "final_amplitude": 0.05,
+  "attempts": 1
+}
