@@ -44,6 +44,15 @@ def log_request(
     conn.close()
 
 
+def count_requests(db_path: Path) -> int:
+    if not db_path.exists():
+        return 0
+    conn = sqlite3.connect(db_path)
+    count = conn.execute("SELECT COUNT(*) FROM predict_log").fetchone()[0]
+    conn.close()
+    return count
+
+
 def get_recent_requests(n: int, db_path: Path) -> list[dict]:
     if not db_path.exists():
         return []

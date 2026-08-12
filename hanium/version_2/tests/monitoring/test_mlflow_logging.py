@@ -6,10 +6,10 @@ class _FakeMlflowClient:
         self.logged = []
         self._raise_on_call = raise_on_call
 
-    def log_metric(self, run_id, key, value):
+    def log_metric(self, run_id, key, value, step=None):
         if self._raise_on_call:
             raise RuntimeError("mlflow 저장소에 연결할 수 없음")
-        self.logged.append((run_id, key, value))
+        self.logged.append((run_id, key, value, step))
 
 
 _SUFFICIENT_STATUS = {
@@ -22,29 +22,37 @@ _SUFFICIENT_STATUS = {
 def test_log_drift_metrics_skips_when_insufficient_data():
     client = _FakeMlflowClient()
 
-    log_drift_metrics({"sufficient_data": False}, "run123", client=client)
+    log_drift_metrics({"sufficient_data": False}, "run123", step=5, client=client)
 
     assert client.logged == []
 
 
-def test_log_drift_metrics_logs_three_metrics_when_sufficient():
+def test_log_drift_metrics_logs_three_metrics_with_given_step():
     client = _FakeMlflowClient()
 
-    log_drift_metrics(_SUFFICIENT_STATUS, "run123", client=client)
+    log_drift_metrics(_SUFFICIENT_STATUS, "run123", step=5, client=client)
 
-    logged_keys = {key for _, key, _ in client.logged}
+    logged_keys = {key for _, key, _, _ in client.logged}
     assert logged_keys == {
         "drift_output_ratio_to_threshold",
         "drift_input_flagged_count",
         "drift_avg_score_recent",
     }
-    assert ("run123", "drift_input_flagged_count", 1) in client.logged
-    assert ("run123", "drift_output_ratio_to_threshold", 1.2) in client.logged
-    assert ("run123", "drift_avg_score_recent", 0.9) in client.logged
+    assert ("run123", "drift_input_flagged_count", 1, 5) in client.logged
+    assert ("run123", "drift_output_ratio_to_threshold", 1.2, 5) in client.logged
+    assert ("run123", "drift_avg_score_recent", 0.9, 5) in client.logged
+
+
+def test_log_drift_metrics_defaults_step_to_zero():
+    client = _FakeMlflowClient()
+
+    log_drift_metrics(_SUFFICIENT_STATUS, "run123", client=client)
+
+    assert all(step == 0 for _, _, _, step in client.logged)
 
 
 def test_log_drift_metrics_swallows_exceptions():
     client = _FakeMlflowClient(raise_on_call=True)
 
     # 예외가 밖으로 안 나가야 한다 - 호출 자체가 실패 없이 끝나면 통과
-    log_drift_metrics(_SUFFICIENT_STATUS, "run123", client=client)
+    log_drift_metrics(_SUFFICIENT_STATUS, "run123", step=5, client=client)

@@ -18,7 +18,7 @@ from openai import OpenAI
 
 from lstm_ae.tracking import CHAMPION_ALIAS, REGISTERED_MODEL_NAME, configure_tracking
 from monitoring.drift import compute_drift_status
-from monitoring.logging import get_recent_requests, log_request
+from monitoring.logging import count_requests, get_recent_requests, log_request
 from monitoring.mlflow_logging import log_drift_metrics
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 from serving.inference import predict_experiment, scale_features
@@ -162,5 +162,5 @@ def drift_status(state: ModelState = Depends(get_model_state)) -> dict:
     status = compute_drift_status(
         recent, threshold=state.thresholds["mean"], window_size=DRIFT_WINDOW_SIZE
     )
-    log_drift_metrics(status, state.mlflow_run_id)
+    log_drift_metrics(status, state.mlflow_run_id, step=count_requests(DB_PATH))
     return {**status, "checked_at": datetime.now(timezone.utc).isoformat()}
