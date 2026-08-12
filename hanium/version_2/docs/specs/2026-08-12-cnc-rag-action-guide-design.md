@@ -46,23 +46,47 @@
 
 ## Part A — 코퍼스 구축 (오프라인, `version_2/rag/build_corpus.py`)
 
-**문서 소스** (실제 접근·추출 가능 여부는 구현 단계에서 직접 확인 — 접근 안 되는
-문서는 빼고 대체 문서를 찾는다):
-- KOSHA `M-4-2016` 다목적 금속가공기계 안전기술지침 (한국어) — 안전조치용
-- Sandvik Coromant 밀링 트러블슈팅 가이드, Toolstoday/Blue Elephant CNC
-  트러블슈팅 자료 (영어) — 원인+조치용
+**문서 소스** (브레인스토밍 단계에서 실제 접근성 검증 완료):
+- ~~KOSHA `M-4-2016`~~ — **접근 불가로 제외**: KOSHA 사이트가 자동화 접근을
+  차단함(WebFetch 시도 시 403 Forbidden, 우회 링크도 전부 죽은 링크). 나중에
+  필요하면 사용자가 브라우저로 직접 PDF를 받아 `sources/`에 추가하는 수동
+  경로로 처리(이번 구현 범위에는 포함 안 함).
+- **OSHA(미국 산업안전보건청) lockout/tagout 공식 해석 문서** (영어) —
+  안전조치용으로 KOSHA 대체. `https://www.osha.gov/laws-regs/standardinterpretations/2005-08-24`
+  — WebFetch로 실제 접근 확인 완료.
+- **Sandvik Coromant 밀링 트러블슈팅 가이드** (영어) — 원인+조치용, 진동/공구마모/
+  칩막힘 3개 카테고리 전부 다룸(약 4,500단어). `https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling`
+  — WebFetch로 실제 접근 확인 완료.
 
-**처리 절차**:
-1. 각 문서에서 텍스트 추출(PDF는 `pypdf`, 웹페이지는 `WebFetch`로 가져온 텍스트).
-2. 문단 단위로 청킹. 한 문단이 500단어를 넘으면 문장 단위로 추가 분할(너무 긴
-   청크가 검색 정밀도를 떨어뜨리는 것을 방지).
-3. 각 청크에 태그 부여:
-   - `fault_category`: `tool_wear` | `feed_overload` | `vibration_backlash` | `general`
-   - `content_type`: `cause`(원인 설명) | `action`(조치) | `safety`(안전수칙)
+**원문 확보 방식**: 브레인스토밍 세션에서 위 두 문서의 본문을 WebFetch로 이미
+가져와 `version_2/rag/sources/`에 로컬 텍스트 파일로 저장해둔다(아래 Task
+목록 참고). `build_corpus.py`는 **라이브 웹 fetch를 하지 않고 이 로컬 파일만
+읽는다** — 매번 재실행할 때 외부 사이트의 봇 차단·페이지 변경에 의존하지 않게
+하기 위함(기존 `data/guide/`의 로컬 PDF 관례와 동일한 패턴).
+
+**처리 절차**: `version_2/rag/sources/*.md` 두 파일은 이미 `##`/`###`
+마크다운 헤딩으로 원인/해결책이 소주제별로 정리돼 있으므로(브레인스토밍 단계에서
+원문을 이 구조로 저장해둠), 복잡한 문단 분리 로직 없이 **`###`(Sandvik) 또는
+`##`(OSHA) 헤딩 단위를 그대로 청크 경계로 삼는다**:
+1. 마크다운을 헤딩 기준으로 분할 → 청크 = 헤딩 제목 + 그 아래 본문.
+2. 각 청크에 태그 부여:
+   - `fault_category`: 소스 파일 상단 주석(`fault_category candidates: ...`,
+     Sandvik은 섹션 번호로 구분: 1=vibration_backlash, 2=tool_wear,
+     3=feed_overload / OSHA는 `general`)에 따라 수동 지정
+   - `content_type`: `cause`(원인 설명) | `action`(조치) | `safety`(안전수칙,
+     OSHA 문서는 전부 `safety`)
 4. OpenAI `text-embedding-3-small`로 청크별 임베딩 계산(1회, 배치 호출).
 5. 저장:
    - `version_2/data/rag/corpus.json` — 청크 원문 + 태그 + 출처(제목/URL)
    - `version_2/data/rag/corpus.index` — FAISS `IndexFlatIP` 직렬화
+
+**주의**: `version_2/data/`는 이 프로젝트 전체에서 `.gitignore` 대상이다(README에
+설명된 `cnc-data.tar.gz` 수동 전달 관례 — `data/model/model.pt`,
+`data/processed/train.csv` 등 기존 산출물과 동일 취급). `sources/*.md`,
+`corpus.json`, `corpus.index`도 git에는 안 올라가고 이 관례를 그대로 따른다 —
+다른 PC에서 쓰려면 `cnc-data.tar.gz`에 포함시켜 옮기거나 `build_corpus.py`를
+그 PC에서 다시 실행해야 한다(소스 md 파일 자체는 이번에 로컬에 저장해두므로
+재실행 시 네트워크 필요 없음, OpenAI 임베딩 API만 필요).
 
 ## Part B — 런타임 검색+생성 (`src/rag/` 신규, `/predict`에 통합)
 
@@ -156,7 +180,8 @@ OpenAI Chat Completion API 호출. 모델명은 환경변수 `OPENAI_CHAT_MODEL`
 | 파일 | 변경 |
 |---|---|
 | `version_2/rag/build_corpus.py` | 신규 — 코퍼스 구축 스크립트(1회성이지만 재실행 가능, `src/`에 안 넣음) |
-| `version_2/data/rag/corpus.json`, `corpus.index` | 신규 — 구축 산출물(git 포함, 재사용 데모/서빙 자산) |
+| `version_2/rag/sources/*.md` | 신규 — 브레인스토밍 단계에서 확보한 원문(Sandvik/OSHA). `data/` 밖에 둬서 **git 추적됨**(재fetch 없이 재현 가능하게) |
+| `version_2/data/rag/corpus.json`, `corpus.index` | 신규 — 구축 산출물, `.gitignore` 대상(`data/model`, `data/processed`와 동일 취급) |
 | `version_2/src/rag/features.py` | 신규 — 피처 설명 사전 |
 | `version_2/src/rag/query.py` | 신규 — 질의 생성 |
 | `version_2/src/rag/retrieval.py` | 신규 — FAISS 검색 |
