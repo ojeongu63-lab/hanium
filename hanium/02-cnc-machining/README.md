@@ -18,8 +18,12 @@ MLOps·RAG를 얹은 것이다. 전체 맥락은 [저장소 README](../README.md
 
 ```bash
 git clone git@github.com:ojeongu63-lab/hanium.git
-cd hanium/02-cnc-machining
+cd hanium/hanium/02-cnc-machining
 ```
+
+`hanium`이 두 번 들어가는 게 오타가 아님 — 저장소 이름이 `hanium`이라 clone하면
+그 이름의 폴더가 생기고, 저장소 안에서 이 프로젝트가 다시 `hanium/` 아래에 있어서
+그렇다(저장소 최상위는 여러 프로젝트를 담고 있음).
 
 처음 clone하는 PC라면 GitHub SSH 키가 그 PC에 없을 수 있음 — 그 경우:
 
