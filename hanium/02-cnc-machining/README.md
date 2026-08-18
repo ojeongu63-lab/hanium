@@ -5,7 +5,7 @@ MLflow(sqlite 백엔드)로 실험을 추적·관리하며, FastAPI로 champion 
 서빙하는 프로젝트.
 
 **성능: precision 0.91 / recall 0.91** (eval 14개 실험 — TP 10 / FP 1 / FN 1 / TN 2,
-mean 임계값 기준). 정상 실험 11개 LOOCV에서도 9개를 정상으로 맞춰, 고정 분할
+p95 임계값 기준). 정상 실험 11개 LOOCV에서도 9개를 정상으로 맞춰, 고정 분할
 결과가 우연이 아님을 확인했다.
 
 이 트랙은 [`../01-cn7-injection-molding/`](../01-cn7-injection-molding/)에서 세운
