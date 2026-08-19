@@ -34,14 +34,18 @@ BACKUP_ROOT = ROOT / "data" / "model_backup"
 COOLDOWN_DAYS = 5
 CONSECUTIVE_K = 3
 # G2 평가에 쓸 최근 라벨 도착 배치 수. 두 모델을 전부 재추론하므로 상한을 둔다.
-GATE_SAMPLE_SIZE = 20
+# 20에서 60으로 올렸다 — G1 은 eval 표본이 14개로 고정돼 손댈 수 없지만,
+# 실제로 판정을 내리는 G2 는 라벨 도착분이 100건 넘게 쌓이는데 20건만 쓰고
+# 있었다. 너무 넓히면 오래된 구간이 섞여 "지금 더 나은가"가 흐려지므로
+# 최근 12일치(60건) 정도로 둔다.
+GATE_SAMPLE_SIZE = 60
 
 
 @dataclass
 class WorkerState:
     flag_history: list[bool] = field(default_factory=list)
     cooldown_remaining: int = 0
-    champion_recall: float = 10 / 11        # 현 champion 실측
+    champion_missed: int = 1                # 현 champion 실측 — 불량 11개 중 1개 놓침
     champion_accuracy: float = 0.0          # 첫 게이트 평가 시 측정값으로 대체
 
 
@@ -82,21 +86,25 @@ def _decide_and_promote(client, state, result, current_day, scenario) -> str:
         print(f"  거부 — 서빙 계약 미충족: {missing}", flush=True)
         return "rejected"
 
-    champion_accuracy, retrained_accuracy = _gate_accuracies(result, current_day, scenario)
+    champion_accuracy, retrained_accuracy, sample_size = _gate_accuracies(
+        result, current_day, scenario
+    )
     verdict = evaluate_gate(
-        retrained_recall=result["recall"],
-        champion_recall=state.champion_recall,
+        retrained_missed=result["missed"],
+        champion_missed=state.champion_missed,
         retrained_accuracy=retrained_accuracy,
         champion_accuracy=champion_accuracy,
     )
     _tag(mlflow_client, result["run_id"], scenario, current_day,
          decision=verdict["decision"], reason=verdict["reject_reason"],
-         extra={"gate_g1_recall": verdict["g1_recall"],
-                "gate_g2_accuracy_delta": verdict["g2_accuracy_delta"]})
+         extra={"gate_g1_missed": verdict["g1_missed"],
+                "gate_g2_accuracy_delta": verdict["g2_accuracy_delta"],
+                "gate_g2_sample_size": sample_size})
 
-    print(f"  게이트: G1 recall={verdict['g1_recall']:.4f} (champion {state.champion_recall:.4f}, "
-          f"허용선 {state.champion_recall - 0.10:.4f}) / G2 delta={verdict['g2_accuracy_delta']:+.4f}",
-          flush=True)
+    print(f"  게이트: G1 놓침={verdict['g1_missed']}건 (champion {state.champion_missed}건, "
+          f"허용 {state.champion_missed + 1}건) / "
+          f"G2 {retrained_accuracy:.2f} vs {champion_accuracy:.2f} "
+          f"(표본 {sample_size}건)", flush=True)
 
     if verdict["decision"] == "rejected":
         print(f"  거부 — {verdict['reject_reason']}  (champion 유지, 사람 확인 필요)", flush=True)
@@ -127,7 +135,7 @@ def _decide_and_promote(client, state, result, current_day, scenario) -> str:
         client.post("/reload-model")
         raise
 
-    state.champion_recall = result["recall"]
+    state.champion_missed = result["missed"]
     print(f"  승격 완료 — version {result['model_version']}", flush=True)
     return "promoted"
 
@@ -150,7 +158,7 @@ def _predict_labels(batch_paths, model, scaler_dict, threshold, baseline, window
     return labels
 
 
-def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[float, float]:
+def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[float, float, int]:
     """G2 입력 — 라벨 도착 구간에서 champion과 재학습 모델의 정확도.
 
     두 모델을 같은 배치에 대고 직접 돌려 비교한다. champion 판정을 predict_log
@@ -170,7 +178,7 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
 
     arrived = get_arrived_labels(current_day, LABELS_DB)[-GATE_SAMPLE_SIZE:]
     if not arrived:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0
 
     timeline_dir = ROOT / "data" / "timeline" / scenario
     batch_paths = [timeline_dir / f"{r['batch_id']}.csv" for r in arrived]
@@ -202,6 +210,7 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
     return (
         accuracy_from_pairs(truths, champion_preds),
         accuracy_from_pairs(truths, retrained_preds),
+        len(truths),
     )
 
 

@@ -160,5 +160,7 @@ def run_retraining(
         "model_version": model_info.registered_model_version,
         "retrain_dir": retrain_dir,
         "recall": summary["results"]["mean"]["recall"],
+        # G1 은 소수 recall 이 아니라 놓친 개수로 비교한다 (eval 불량이 11개뿐).
+        "missed": int(summary["results"]["mean"]["fn"]),
         "thresholds": summary["thresholds"],
     }

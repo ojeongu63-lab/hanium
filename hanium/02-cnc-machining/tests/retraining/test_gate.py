@@ -1,14 +1,15 @@
 import pytest
 
-from retraining.gate import evaluate_gate
+from retraining.gate import accuracy_from_pairs, evaluate_gate
 
-CHAMPION_RECALL = 10 / 11  # 0.9091 — 현 champion 실측
+# 현 champion 은 eval 불량 11개 중 10개를 잡는다 → 1건 놓침.
+CHAMPION_MISSED = 1
 
 
 def test_promoted_when_both_conditions_pass():
     result = evaluate_gate(
-        retrained_recall=CHAMPION_RECALL,
-        champion_recall=CHAMPION_RECALL,
+        retrained_missed=CHAMPION_MISSED,
+        champion_missed=CHAMPION_MISSED,
         retrained_accuracy=0.90,
         champion_accuracy=0.70,
     )
@@ -20,10 +21,10 @@ def test_promoted_when_both_conditions_pass():
 
 
 def test_g1_boundary_one_extra_miss_passes():
-    # 9/11 = 0.8182, 허용선 0.9091 - 0.10 = 0.8091 → 통과
+    # champion 1건 놓침 + 허용 1건 = 2건까지 통과
     result = evaluate_gate(
-        retrained_recall=9 / 11,
-        champion_recall=CHAMPION_RECALL,
+        retrained_missed=2,
+        champion_missed=CHAMPION_MISSED,
         retrained_accuracy=0.90,
         champion_accuracy=0.70,
     )
@@ -33,10 +34,9 @@ def test_g1_boundary_one_extra_miss_passes():
 
 
 def test_g1_boundary_two_extra_misses_rejects():
-    # 8/11 = 0.7273 < 0.8091 → 거부
     result = evaluate_gate(
-        retrained_recall=8 / 11,
-        champion_recall=CHAMPION_RECALL,
+        retrained_missed=3,
+        champion_missed=CHAMPION_MISSED,
         retrained_accuracy=0.90,
         champion_accuracy=0.70,
     )
@@ -46,10 +46,25 @@ def test_g1_boundary_two_extra_misses_rejects():
     assert "G1" in result["reject_reason"]
 
 
+def test_g1_passes_when_model_catches_everything():
+    # 모든 것을 불량이라 판정하는 모델은 놓친 개수 0 이라 G1 을 통과한다.
+    # 이것이 G2 가 반드시 필요한 이유다 — 실제 실행에서 벌어진 상황이기도 하다.
+    result = evaluate_gate(
+        retrained_missed=0,
+        champion_missed=CHAMPION_MISSED,
+        retrained_accuracy=0.40,
+        champion_accuracy=1.00,
+    )
+
+    assert result["g1_pass"] is True
+    assert result["g2_pass"] is False
+    assert result["decision"] == "rejected"
+
+
 def test_g2_rejects_when_no_improvement():
     result = evaluate_gate(
-        retrained_recall=CHAMPION_RECALL,
-        champion_recall=CHAMPION_RECALL,
+        retrained_missed=CHAMPION_MISSED,
+        champion_missed=CHAMPION_MISSED,
         retrained_accuracy=0.70,
         champion_accuracy=0.70,
     )
@@ -61,8 +76,8 @@ def test_g2_rejects_when_no_improvement():
 
 def test_reject_reason_lists_both_violations():
     result = evaluate_gate(
-        retrained_recall=0.10,
-        champion_recall=CHAMPION_RECALL,
+        retrained_missed=9,
+        champion_missed=CHAMPION_MISSED,
         retrained_accuracy=0.10,
         champion_accuracy=0.70,
     )
@@ -73,8 +88,8 @@ def test_reject_reason_lists_both_violations():
 
 def test_accuracy_delta_is_reported():
     result = evaluate_gate(
-        retrained_recall=CHAMPION_RECALL,
-        champion_recall=CHAMPION_RECALL,
+        retrained_missed=CHAMPION_MISSED,
+        champion_missed=CHAMPION_MISSED,
         retrained_accuracy=0.85,
         champion_accuracy=0.70,
     )
@@ -83,19 +98,15 @@ def test_accuracy_delta_is_reported():
 
 
 def test_accuracy_from_pairs_counts_matches():
-    from retraining.gate import accuracy_from_pairs
-
-    assert accuracy_from_pairs(["good", "bad", "good"], ["good", "bad", "bad"]) == pytest.approx(2 / 3)
+    assert accuracy_from_pairs(
+        ["good", "bad", "good"], ["good", "bad", "bad"]
+    ) == pytest.approx(2 / 3)
 
 
 def test_accuracy_from_pairs_all_correct():
-    from retraining.gate import accuracy_from_pairs
-
     assert accuracy_from_pairs(["good", "bad"], ["good", "bad"]) == 1.0
 
 
 def test_accuracy_from_pairs_rejects_length_mismatch():
-    from retraining.gate import accuracy_from_pairs
-
     with pytest.raises(ValueError, match="길이가 다릅니다"):
         accuracy_from_pairs(["good", "bad"], ["good"])
