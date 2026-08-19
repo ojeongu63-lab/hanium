@@ -127,36 +127,38 @@ def main() -> None:
 
     out_dir = ROOT / "data" / "timeline" / args.scenario
     out_dir.mkdir(parents=True, exist_ok=True)
-    client = TestClient(app)
     state = WorkerState()
 
-    for day in range(1, args.days + 1):
-        for index in range(BATCHES_PER_DAY):
-            batch_id = f"day{day:02d}_{index}"
-            batch = generate_batch(day, index, args.scenario)
-            csv_path = out_dir / f"{batch_id}.csv"
-            batch.to_csv(csv_path, index=False)
+    # with 블록이어야 lifespan 이 돌아 champion 모델이 로드된다
+    # (simulate_drift.py 와 같은 관례). 없으면 /predict 가 503 을 낸다.
+    with TestClient(app) as client:
+        for day in range(1, args.days + 1):
+            for index in range(BATCHES_PER_DAY):
+                batch_id = f"day{day:02d}_{index}"
+                batch = generate_batch(day, index, args.scenario)
+                csv_path = out_dir / f"{batch_id}.csv"
+                batch.to_csv(csv_path, index=False)
 
-            with csv_path.open("rb") as fh:
-                response = client.post(
-                    "/predict", files={"file": (csv_path.name, fh, "text/csv")}
+                with csv_path.open("rb") as fh:
+                    response = client.post(
+                        "/predict", files={"file": (csv_path.name, fh, "text/csv")}
+                    )
+                response.raise_for_status()
+
+                record_label(
+                    batch_id=batch_id,
+                    produced_day=day,
+                    arrived_day=day + LABEL_DELAY_DAYS,
+                    label=true_label(args.scenario, day),
+                    db_path=LABELS_DB,
                 )
-            response.raise_for_status()
 
-            record_label(
-                batch_id=batch_id,
-                produced_day=day,
-                arrived_day=day + LABEL_DELAY_DAYS,
-                label=true_label(args.scenario, day),
-                db_path=LABELS_DB,
+            result = tick(client, state, current_day=day, scenario=args.scenario)
+            print(
+                f"Day {day:02d}  score/threshold={result['ratio']:.2f}  "
+                f"flagged={result['flagged']}  action={result['action']}",
+                flush=True,
             )
-
-        result = tick(client, state, current_day=day, scenario=args.scenario)
-        print(
-            f"Day {day:02d}  score/threshold={result['ratio']:.2f}  "
-            f"flagged={result['flagged']}  action={result['action']}",
-            flush=True,
-        )
 
 
 if __name__ == "__main__":
