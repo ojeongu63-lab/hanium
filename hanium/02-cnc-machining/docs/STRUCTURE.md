@@ -120,10 +120,19 @@ hanium/
 │   │   ├── generation.py           ·  검색 결과 기반 조치 가이드 생성 (OpenAI)
 │   │   └── guide.py                ·  위 단계 오케스트레이션. 정상 판정 시 고정 응답
 │   │
-│   └── monitoring/                 ⑥ 운영 모니터링
-│       ├── logging.py              ·  요청/판정 이력 sqlite 적재
-│       ├── drift.py                ·  드리프트 판정. 입력 z>2.0, 불량비율>0.8
-│       └── mlflow_logging.py       ·  드리프트 지표를 champion run에 기록
+│   ├── monitoring/                 ⑥ 운영 모니터링
+│   │   ├── logging.py              ·  요청/판정 이력 sqlite 적재
+│   │   ├── drift.py                ·  드리프트 판정. 입력 z>2.0, 불량비율>0.8
+│   │   ├── labels.py               ·  지연 도착 QC 라벨 적재/조회
+│   │   └── mlflow_logging.py       ·  드리프트 지표를 champion run에 기록
+│   │
+│   └── retraining/                 ⑦ 드리프트 트리거 자동 재학습
+│       ├── trigger.py              ·  연속 3회 flagged + 쿨다운 5일이면 발동
+│       ├── runner.py               ·  라벨 도착 정상배치로 재학습. scaler 재fit,
+│       │                           ·  eval 재스케일링, 산출물은 data/retrain/에 격리
+│       ├── gate.py                 ·  G1 원본 eval recall 회귀(−0.10 이내)
+│       │                           ·  G2 라벨 도착 구간 정확도 개선. 둘 다 만족해야 승격
+│       └── promotion.py            ·  서빙 계약 확인 + 백업/교체/롤백
 │
 ├── scripts/                        ■ 주 파이프라인 실행 진입점
 │   ├── run_preprocessing.py        ·  ② 전처리 실행
@@ -150,7 +159,11 @@ hanium/
 │   └── generate_augmented.py       ·  결과물은 용량 문제로 git 제외
 │
 ├── monitoring/                     ■ 드리프트 상황 시뮬레이션
-│   └── simulate_drift.py           ·  운영 중 분포 변화 재현 (콘솔 출력)
+│   ├── simulate_drift.py           ·  운영 중 분포 변화 재현 (콘솔 출력)
+│   ├── simulate_timeline.py        ·  가상 운영 40일 타임라인 생성 + 주입
+│   │                               ·  시나리오 2종: temperature / tool_wear
+│   ├── sweep_drift_constants.py    ·  변형 상수를 실측 대역에 맞춰 산정
+│   └── drift_worker.py             ·  감시 워커 — 폴링/트리거/재학습/게이트/승격
 │
 ├── tests/                          ■ 단위 테스트 100개 — src/ 구조를 그대로 반영
 │   ├── preprocessing/  lstm_ae/  serving/  rag/  monitoring/
