@@ -1,91 +1,82 @@
-# 폴더 구조 정리 (2026-08-14)
+# 드리프트 트리거 기반 자동 재학습 (2026-08-19)
 
 ## 목적
 
-멘토·팀원이 저장소를 처음 클론했을 때, 폴더 목록만 보고 **무엇을 먼저
-봐야 하는지** 바로 알 수 있게 만든다. 현재는 루트에 README가 없고
-`version_2/`라는 이름이 트랙의 정체를 감추고 있어, 처음 보는 사람이
-접힌 1차 트랙(CN7)을 메인으로 오해하기 쉽다.
+멘토 제안: "드리프트가 감지되면 자동으로 재학습되는 것까지 보여달라."
+
+해결하려는 문제는 **제품은 정상인데 공정 파라미터가 변해서 모델이 불량으로
+오판하는 상황**이다. 계절·온도 변화로 입력 분포가 이동하면 모델이 학습한
+"정상의 정의"가 낡아 오탐이 늘고, 이때 필요한 건 설비 정비가 아니라 재학습이다.
+
+단, 같은 드리프트 신호가 정반대 원인(설비가 실제로 망가져 불량품이 나옴)에서도
+나온다. 지표만으로는 구분할 수 없으므로 구조는 "트리거 → 재학습"이 아니라
+**"트리거 → 재학습 → 게이트 → 승격 또는 거부"** 가 된다.
+
+- 스펙: `02-cnc-machining/docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md`
+- 구현 계획(코드 포함): `02-cnc-machining/docs/plans/2026-08-19-cnc-drift-triggered-retraining.md`
 
 ## 결정 사항
 
-- 두 트랙에 번호 접두사를 붙여 진행 순서를 드러낸다
-  (`01-cn7-injection-molding/`, `02-cnc-machining/`)
-- CNC 트랙 내부의 실험 폴더(`loocv/`, `synthetic/`, `rag/`,
-  `augmentation/`, `monitoring/`)는 **건드리지 않는다** — 스크립트가
-  `Path(__file__).parent.parent`로 루트를 역산해서 깊이가 코드에 박혀
-  있고, 통합 이득보다 회귀 위험이 크다. README 설명으로 해결한다.
-- `pyproject.toml`의 `name` 필드는 **바꾸지 않는다** — uv_build의 패키지
-  탐색 키라서 변경 시 `module-name` 오버라이드가 추가로 필요하다.
-  `description`만 정확하게 손본다.
+- **데이터**: 생성 모델(TimeGAN)이나 물리 시뮬레이션이 아니라, train 실험 8개에
+  날짜 비례 변형을 주입해 가상 운영 타임라인을 만든다. 25개 실험으로는 생성
+  모델을 학습시킬 수 없고, 물리 모델은 별도 프로젝트 규모다.
+- **시나리오 2종**: 온도·계절(승격 경로) / 공구마모(거부 경로). 두 경로가 다
+  있어야 게이트가 장식이 아님을 보일 수 있다.
+- **게이트 2조건 AND**: G1 원본 eval recall이 champion 대비 −0.10 이내(불량 11개
+  기준 1건까지 허용), G2 라벨 도착 구간 정확도가 champion보다 개선.
+- **선행 결정 번복**: `2026-08-12-cnc-drift-monitoring-design.md`가 자동 재학습을
+  비목표로 뒀으나 뒤집는다. 근거는 게이트를 함께 만들기 때문이다.
+- **기존 결함 2건 동시 수정**: 서빙이 champion을 시작 시 한 번만 로드하는 문제,
+  scaler/baseline이 모델과 함께 버전 관리되지 않는 문제. 수동 승격에서는 안
+  드러나지만 자동 루프에서는 즉시 터진다.
+- `src/lstm_ae/`, `src/preprocessing/`, `src/monitoring/drift.py`, `logging.py`는
+  **수정하지 않는다.** 호출·재사용만 한다.
 
 ## 작업
 
-- [x] 1. `01-cn7-injection-molding/` 생성 후 루트의 CN7 트랙 이동
-      → 검증: `git status`에 `R`(rename)로 잡히는지
-- [x] 2. `version_2/` → `02-cnc-machining/` rename
-      → 검증: 스크립트 `ROOT` 계산 깊이 불변 확인
-- [x] 3. `docs/superpowers/{specs,plans}` → `docs/{specs,plans}` 평탄화,
-      결과 리포트 docx를 `docs/`로 이동
-      → 검증: 두 트랙의 문서 경로 규칙이 같은지
-- [x] 4. README 3종 (루트 신규 / 01번 신규 / 02번 경로 문구 갱신)
-      → 검증: `grep -rn version_2` 잔여 0건
-- [x] 5. 전체 검증 (테스트 통과, 잔여물 정리)
-      → 검증: 두 트랙 `uv run pytest` 통과
+- [ ] 1. QC 라벨 저장소 `src/monitoring/labels.py`
+      → 검증: 지연 도착 조회 왕복 테스트 3개, 전체 103개 통과
+- [ ] 2. 재학습 트리거 `src/retraining/trigger.py` (연속 3회 + 쿨다운)
+      → 검증: 순수 함수 테스트 8개, 전체 111개 통과
+- [ ] 3. 승격 게이트 `src/retraining/gate.py` (G1/G2)
+      → 검증: 경계값 9/11 통과·8/11 거부 포함 6개, 전체 117개 통과
+- [ ] 4. 서빙 계약 검증 + 백업/교체/롤백 `src/retraining/promotion.py`
+      → 검증: 실패 주입 롤백 테스트 포함 7개, 전체 124개 통과
+- [ ] 5. `POST /reload-model` 추가 (결함 ①)
+      → 검증: 실패 시 기존 상태 유지 테스트, 전체 126개 통과
+- [ ] 6. 동반 아티팩트 버전 결합 + 폴백 (결함 ②)
+      → 검증: 실제 champion이 폴백 경로로 로드되는지, 전체 128개 통과
+- [ ] 7. 재학습 데이터 구성 `src/retraining/runner.py`
+      → 검증: 라벨 필터·eval 재스케일링 테스트 6개, 전체 134개 통과
+- [ ] 8. 재학습 실행 + MLflow 서빙 계약 충족
+      → 검증: `window_size` param 존재 테스트, 전체 135개 통과
+- [ ] 9. 타임라인 스트림 생성기 `monitoring/simulate_timeline.py`
+      → 검증: perturbation이 `SetPosition`을 건드리지 않는지 직접 확인
+- [ ] 10. 변형 상수 스윕으로 확정 (자리값 0.0 교체)
+      → 검증: Day 40 도달 비율이 목표 대역(A 1.5~2.0, B 3.0) 안인지
+- [ ] 11. 감시 워커 `monitoring/drift_worker.py`
+      → 검증: import 성공, 전체 135개 통과
+- [ ] 12. 시나리오 A 실행 — 승격 경로
+      → 검증: `action=promoted`, 승격 후 오탐 감소
+- [ ] 13. 시나리오 B 실행 — 거부 경로 + 결함 ② 수정 확인
+      → 검증: `action=rejected` + 거부 후 정본 파일 해시 불변
 
-## 리뷰
+## 주의
 
-### 결과
+- 공유 서버다. 재학습·스윕·타임라인 실행은 전부 `nice -n 19`를 붙이고,
+  시작 전 `who` / `top`으로 부하를 확인한다.
+- Task 10 전까지 `simulate_timeline.py`의 `POS_DRIFT`/`CUR_DRIFT`/`WEAR_RATE`는
+  자리값 `0.0`이다. Task 10 Step 4의 assert가 교체 누락을 잡는다.
+- Task 12·13에서 기대와 다른 결과가 나오면 **값을 조정해 통과시키지 않는다.**
+  관측값을 그대로 보고하고 논의한다. 조정하게 되면 그 사실과 근거를 스펙의
+  "남은 리스크" 절에 남긴다.
 
-```
-hanium/
-├── README.md                      신규 — 진입점, 두 트랙 서사
-├── 01-cn7-injection-molding/      (구 루트 산재 파일)
-│   └── README.md                  신규
-├── 02-cnc-machining/              (구 version_2)
-│   └── README.md                  경로 갱신 + 구조 표 개편
-└── tasks/
-```
+## 리뷰 — 시나리오 A
 
-git 기준 rename 146건 / 수정 23건 / 신규 5건. 이동은 전부 `git mv`라
-이력이 보존됐다(`git log --follow` 추적 가능).
+(Task 12 완료 후 작성: 트리거 발동일 / G1 recall / G2 정확도 차 / 승격 버전 /
+승격 전후 score-threshold 비율 / 계획과 달랐던 점)
 
-### 계획과 달랐던 점
+## 리뷰 — 시나리오 B
 
-1. **문서 경로 참조 범위가 예상보다 넓었다.** 계획 때는 README 14곳으로
-   봤으나 실제로는 스펙·플랜 문서 전반에 `version_2` 참조가 **477곳** 있었다.
-   전수 확인 결과 전부 폴더 위치를 가리키는 참조였고("2차 버전"이라는 추상적
-   의미로 쓰인 곳 없음), 파일이 실제로 이동했으므로 일괄 치환했다. 날짜·결정·
-   결과 수치는 건드리지 않았다.
-
-2. **`.venv` 이동으로 실행 스크립트 shebang이 깨졌다.** `.venv/bin/pytest`가
-   옛 절대경로를 가리켜 `uv run pytest`가 실패했다. `uv sync`는 `pyvenv.cfg`가
-   유효하면 재생성을 건너뛰므로 고쳐지지 않는다 — `.venv`를 지우고 다시 만들어야
-   했다. **venv는 옮기지 말고 지웠다가 재생성하는 게 맞다.**
-
-3. **MLflow DB에 절대경로가 박혀 있었다.** `experiments.artifact_location`,
-   `runs.artifact_uri` 등이 `.../version_2/...`를 가리켜 rename으로 깨질 수
-   있었다. 다행히 `tracking.py`의 `_repair_stale_artifact_paths()`가 정확히 이
-   상황(다른 머신에서 DB 복사)을 처리하도록 이미 구현돼 있어, `configure_tracking()`
-   호출만으로 4개 테이블이 자동 복구됐다.
-
-### 검증 결과
-
-| 항목 | 결과 |
-|---|---|
-| `git status` rename 인식 | 146건 전부 `R` |
-| 01번 트랙 `uv run pytest` | **31 passed** |
-| 02번 트랙 `uv run pytest` | **100 passed** |
-| `version_2` / `docs/superpowers` 잔여 참조 | **0건** |
-| MLflow 아티팩트 경로 복구 | 4개 테이블 전부 새 경로 |
-| champion 모델 로드 | 성공 |
-
-### 남은 것
-
-- ~~`02-cnc-machining/mlflow.db` 잔여물~~ → **삭제 완료.** run 0개 / 등록모델
-  0개인 빈 껍데기임을 확인 후 지웠다(정상 DB `data/mlflow/mlflow.db`는 run 1개 +
-  모델 1개 그대로). 잘못된 위치에서 mlflow를 띄웠을 때 생긴 파일로 보인다.
-- 커밋은 사용자가 직접 확인 후 진행.
-- `experiments` 테이블에 `.../version_2/mlruns/0`(MLflow 기본 Default 실험)
-  경로가 남아 있으나, 이 프로젝트가 쓰지 않는 실험이고 해당 디렉터리도 존재하지
-  않아 무해하다.
+(Task 13 완료 후 작성: 트리거 발동일 / 재학습 모델 recall과 G1 허용선 / 거부 사유 /
+정본 파일 해시 대조 결과 / 계획과 달랐던 점)
