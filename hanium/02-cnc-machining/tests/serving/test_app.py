@@ -235,3 +235,36 @@ def test_reload_model_keeps_previous_state_on_failure(monkeypatch):
 
     assert response.status_code == 500
     assert app_module._state is previous  # 교체 실패가 서빙 중단으로 번지지 않는다
+
+
+def test_companion_json_falls_back_to_local_path(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    fallback = tmp_path / "scaler.json"
+    fallback.write_text('{"from": "fallback"}')
+
+    def _fail_download(**kwargs):
+        raise RuntimeError("아티팩트 없음")
+
+    monkeypatch.setattr(app_module.mlflow.artifacts, "download_artifacts", _fail_download)
+
+    result = app_module.load_companion_json("run-without-artifact", "scaler.json", fallback)
+
+    assert result == {"from": "fallback"}
+
+
+def test_companion_json_prefers_mlflow_artifact(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    fallback = tmp_path / "scaler.json"
+    fallback.write_text('{"from": "fallback"}')
+    artifact = tmp_path / "downloaded.json"
+    artifact.write_text('{"from": "artifact"}')
+
+    monkeypatch.setattr(
+        app_module.mlflow.artifacts, "download_artifacts", lambda **kwargs: str(artifact)
+    )
+
+    result = app_module.load_companion_json("run-with-artifact", "scaler.json", fallback)
+
+    assert result == {"from": "artifact"}

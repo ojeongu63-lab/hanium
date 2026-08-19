@@ -9,6 +9,7 @@ from typing import Literal
 
 import faiss
 import mlflow
+import mlflow.artifacts
 import mlflow.pytorch
 import pandas as pd
 import torch
@@ -59,6 +60,25 @@ def load_rag_state() -> tuple[list[dict] | None, object | None, object | None]:
     return rag_corpus, rag_index, openai_client
 
 
+def load_companion_json(run_id: str, name: str, fallback: Path) -> dict:
+    """모델 run에 붙은 동반 아티팩트를 우선 읽고, 없으면 고정 경로로 폴백한다.
+
+    scaler와 feature_baseline은 모델과 짝이 맞아야 하는데, 원래는 고정 경로에만
+    있어 모델 버전과 따로 놀았다. 자동 재학습이 이 파일들을 덮어쓰면 champion과
+    짝이 어긋나 조용히 틀린 스케일로 추론하게 된다.
+
+    폴백이 필요한 이유: 최초 학습으로 만들어진 기존 champion run에는 이
+    아티팩트가 없다. 자동 재학습으로 만들어진 run만 갖고 있다.
+    """
+    try:
+        local_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id, artifact_path=f"companion/{name}"
+        )
+        return json.loads(Path(local_path).read_text())
+    except Exception:
+        return json.loads(fallback.read_text())
+
+
 def load_model_state() -> ModelState:
     configure_tracking()
     client = MlflowClient()
@@ -69,8 +89,12 @@ def load_model_state() -> ModelState:
         method: run.data.metrics[f"{method}_threshold"] for method in ["mean", "max", "p95"]
     }
     window_size = int(run.data.params["window_size"])
-    scaler_dict = json.loads((ROOT / "data" / "processed" / "scaler.json").read_text())
-    feature_baseline = json.loads((ROOT / "data" / "model" / "feature_baseline.json").read_text())
+    scaler_dict = load_companion_json(
+        mv.run_id, "scaler.json", ROOT / "data" / "processed" / "scaler.json"
+    )
+    feature_baseline = load_companion_json(
+        mv.run_id, "feature_baseline.json", ROOT / "data" / "model" / "feature_baseline.json"
+    )
     rag_corpus, rag_index, openai_client = load_rag_state()
     return ModelState(
         model=model,
