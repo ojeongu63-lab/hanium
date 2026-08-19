@@ -81,3 +81,15 @@ def test_rescale_eval_moves_to_new_coordinates_and_keeps_labels():
     # raw = 10, 12  →  (raw - 10) / 2 = 0, 1
     np.testing.assert_allclose(result["X_OutputPower"], [0.0, 1.0])
     assert result["label"].tolist() == [0, 1]
+
+
+def test_retrain_params_include_window_size_for_serving_contract():
+    from retraining.runner import build_retrain_params
+
+    params = build_retrain_params(batch_days="11-21", batch_count=55)
+
+    # src/serving/app.py 가 이 param 을 직접 읽는다. 없으면 승격 후 로드가 죽는다.
+    assert "window_size" in params
+    assert params["source"] == "auto_retrain"
+    assert params["retrain_batch_days"] == "11-21"
+    assert params["retrain_batch_count"] == 55
