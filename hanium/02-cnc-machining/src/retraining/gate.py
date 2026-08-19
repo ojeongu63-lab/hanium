@@ -39,3 +39,13 @@ def evaluate_gate(
         "g2_accuracy_delta": retrained_accuracy - champion_accuracy,
         "reject_reason": "; ".join(reasons),
     }
+
+
+def accuracy_from_pairs(truths: list[str], predictions: list[str]) -> float:
+    """QC 진실 라벨과 모델 판정을 짝지어 정확도를 낸다. 둘 다 "good"/"bad" 문자열."""
+    if not truths or len(truths) != len(predictions):
+        raise ValueError(
+            f"라벨 {len(truths)}개와 판정 {len(predictions)}개의 길이가 다릅니다"
+        )
+    hits = sum(1 for truth, pred in zip(truths, predictions) if truth == pred)
+    return hits / len(truths)

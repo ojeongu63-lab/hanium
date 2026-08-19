@@ -80,3 +80,22 @@ def test_accuracy_delta_is_reported():
     )
 
     assert result["g2_accuracy_delta"] == pytest.approx(0.15)
+
+
+def test_accuracy_from_pairs_counts_matches():
+    from retraining.gate import accuracy_from_pairs
+
+    assert accuracy_from_pairs(["good", "bad", "good"], ["good", "bad", "bad"]) == pytest.approx(2 / 3)
+
+
+def test_accuracy_from_pairs_all_correct():
+    from retraining.gate import accuracy_from_pairs
+
+    assert accuracy_from_pairs(["good", "bad"], ["good", "bad"]) == 1.0
+
+
+def test_accuracy_from_pairs_rejects_length_mismatch():
+    from retraining.gate import accuracy_from_pairs
+
+    with pytest.raises(ValueError, match="길이가 다릅니다"):
+        accuracy_from_pairs(["good", "bad"], ["good"])
