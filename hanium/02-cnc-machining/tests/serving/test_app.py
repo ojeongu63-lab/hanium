@@ -201,3 +201,37 @@ def test_drift_status_flags_after_enough_requests(tmp_path, monkeypatch):
     body = response.json()
     assert body["sufficient_data"] is True
     assert body["n_requests_logged"] == 2
+
+
+def test_reload_model_swaps_state_on_success(monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "_state", _fake_state())
+    new_state = _fake_state()
+    new_state.model_version = "7"
+    monkeypatch.setattr(app_module, "load_model_state", lambda: new_state)
+    client = TestClient(app)
+
+    response = client.post("/reload-model")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "reloaded", "model_version": "7"}
+    assert app_module._state is new_state
+
+
+def test_reload_model_keeps_previous_state_on_failure(monkeypatch):
+    import serving.app as app_module
+
+    previous = _fake_state()
+    monkeypatch.setattr(app_module, "_state", previous)
+
+    def _boom():
+        raise RuntimeError("MLflow 접속 실패")
+
+    monkeypatch.setattr(app_module, "load_model_state", _boom)
+    client = TestClient(app)
+
+    response = client.post("/reload-model")
+
+    assert response.status_code == 500
+    assert app_module._state is previous  # 교체 실패가 서빙 중단으로 번지지 않는다

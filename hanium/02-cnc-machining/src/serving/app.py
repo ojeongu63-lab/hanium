@@ -164,3 +164,20 @@ def drift_status(state: ModelState = Depends(get_model_state)) -> dict:
     )
     log_drift_metrics(status, state.mlflow_run_id, step=count_requests(DB_PATH))
     return {**status, "checked_at": datetime.now(timezone.utc).isoformat()}
+
+
+@app.post("/reload-model")
+def reload_model() -> dict:
+    """champion alias가 바뀐 뒤 돌고 있는 서버가 새 모델을 집어들게 한다.
+
+    로드에 실패하면 기존 상태를 유지한다 — 교체 실패가 서빙 중단으로
+    번지면 안 된다.
+    """
+    global _state
+    previous = _state
+    try:
+        _state = load_model_state()
+    except Exception as exc:
+        _state = previous
+        raise HTTPException(status_code=500, detail=f"모델 리로드 실패, 기존 모델 유지: {exc}")
+    return {"status": "reloaded", "model_version": _state.model_version}
