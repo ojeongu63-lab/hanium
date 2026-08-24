@@ -66,7 +66,10 @@ def test_health_returns_503_when_not_loaded():
     assert response.status_code == 503
 
 
-def test_predict_returns_prediction_for_valid_csv():
+def test_predict_returns_prediction_for_valid_csv(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
     np.random.seed(0)
     app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
     client = TestClient(app)
@@ -127,7 +130,10 @@ def test_predict_returns_400_for_empty_file():
     assert response.status_code == 400
 
 
-def test_predict_response_includes_guide_field():
+def test_predict_response_includes_guide_field(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
     np.random.seed(0)
     app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
     client = TestClient(app)
