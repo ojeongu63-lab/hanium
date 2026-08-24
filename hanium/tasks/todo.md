@@ -279,11 +279,17 @@ HTTP로 폴링해 Day 01~03을 순서대로 감지, 매번 `flagged=False action
 남긴 `labels.db`/`requests.db`/`data/timeline/temperature`는 백업에서 복원 및
 삭제로 원상복구. 전체 테스트 141개 통과(신규 2개 포함).
 
-부수 발견(고치지 않음, 범위 밖): `tests/serving/test_app.py`의 예측 테스트
-일부가 `DB_PATH`를 monkeypatch하지 않아 `uv run pytest`를 돌릴 때마다 실제
-`data/monitoring/requests.db`에 요청 2건이 실기록된다. 이번에 두 번 발견해
-직접 지워 복구했다. 기존 테스트 위생 문제이고 이번 작업 범위 밖이라 손대지
-않았다.
+부수 발견 → **2026-08-24에 수정함**: `tests/serving/test_app.py`의 예측
+테스트 일부가 `DB_PATH`를 monkeypatch하지 않아 `uv run pytest`를 돌릴
+때마다 실제 `data/monitoring/requests.db`에 요청 2건이 실기록됐다.
+여러 번 발견해 직접 지워 복구하다가, 사용자 요청으로 근본 수정.
+오염 원인은 `test_predict_returns_prediction_for_valid_csv`와
+`test_predict_response_includes_guide_field` 두 개뿐이었다(둘 다
+`/predict` 성공 경로 — `predict_experiment`가 성공해야 `log_request`에
+도달하므로, 400 에러 테스트 3개는 애초에 그 줄에 안 닿아 오염과 무관함을
+개별 실행으로 확인). 두 테스트에 `monkeypatch.setattr(app_module,
+"DB_PATH", tmp_path / "requests.db")` 추가, 전체 스위트 두 번 연속
+돌려도 `requests.db` count가 202로 안 바뀜을 확인. 커밋 `3f0c99c`.
 
 ## 리뷰 — 사용자가 직접 실행해 잡은 버그 (2026-08-24)
 
