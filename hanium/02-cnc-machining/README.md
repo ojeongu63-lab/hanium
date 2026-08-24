@@ -8,9 +8,9 @@ MLflow(sqlite 백엔드)로 실험을 추적·관리하며, FastAPI로 champion 
 p95 임계값 기준). 정상 실험 11개 LOOCV에서도 9개를 정상으로 맞춰, 고정 분할
 결과가 우연이 아님을 확인했다.
 
-이 트랙은 [`../01-cn7-injection-molding/`](../01-cn7-injection-molding/)에서 세운
-LSTM-AE 방법론을 **다른 제조공정에 재적용해 유효성을 검증**하고, 거기에
-MLOps·RAG를 얹은 것이다. 전체 맥락은 [저장소 README](../README.md) 참고.
+이 LSTM-AE 방법론은 원래 다른 제조공정 데이터에 먼저 적용해봤다가, **CNC
+가공 데이터에 재적용해 유효성을 검증**하고, 거기에 MLOps·RAG를 얹은 것이다.
+전체 맥락은 [저장소 README](../README.md) 참고.
 
 ## 1. 다른 PC에서 처음 설정하기
 
