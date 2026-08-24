@@ -114,44 +114,69 @@ def generate_batch(day: int, index: int, scenario: str) -> pd.DataFrame:
     return PERTURBATIONS[scenario](df, progress_for(day))
 
 
+def feed_day(client, day: int, scenario: str, out_dir: Path) -> None:
+    """하루치 배치를 생성해 /predict 로 흘려보내고 라벨을 기록한다.
+    감시는 하지 않는다 — --serve-url 모드에서는 drift_worker.py 가 별도
+    프로세스로 폴링하며 감시한다."""
+    for index in range(BATCHES_PER_DAY):
+        batch_id = f"day{day:02d}_{index}"
+        batch = generate_batch(day, index, scenario)
+        csv_path = out_dir / f"{batch_id}.csv"
+        batch.to_csv(csv_path, index=False)
+
+        with csv_path.open("rb") as fh:
+            response = client.post(
+                "/predict", files={"file": (csv_path.name, fh, "text/csv")}
+            )
+        response.raise_for_status()
+
+        record_label(
+            batch_id=batch_id,
+            produced_day=day,
+            arrived_day=day + LABEL_DELAY_DAYS,
+            label=true_label(scenario, day),
+            db_path=LABELS_DB,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="가상 운영 타임라인 생성 및 주입")
     parser.add_argument("scenario", choices=list(PERTURBATIONS))
     parser.add_argument("--days", type=int, default=TOTAL_DAYS)
+    parser.add_argument(
+        "--serve-url",
+        default=None,
+        help="지정하면 이 주소의 실제 서버로 배치를 쏜다(진짜 HTTP, 별도 프로세스로 "
+        "떠 있는 uvicorn 대상). 감시는 이 프로세스가 하지 않고 별도로 띄운 "
+        "drift_worker.py 가 폴링한다. 생략하면 기존처럼 TestClient로 이 "
+        "프로세스 안에서 감시까지 함께 한다.",
+    )
     args = parser.parse_args()
+
+    out_dir = ROOT / "data" / "timeline" / args.scenario
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.serve_url:
+        import httpx2
+
+        with httpx2.Client(base_url=args.serve_url, timeout=30.0) as client:
+            for day in range(1, args.days + 1):
+                feed_day(client, day, args.scenario, out_dir)
+                print(f"Day {day:02d}  {BATCHES_PER_DAY}개 배치 전송 완료", flush=True)
+        return
 
     from fastapi.testclient import TestClient
     from serving.app import app
 
     from drift_worker import WorkerState, tick  # 같은 폴더
 
-    out_dir = ROOT / "data" / "timeline" / args.scenario
-    out_dir.mkdir(parents=True, exist_ok=True)
     state = WorkerState()
 
     # with 블록이어야 lifespan 이 돌아 champion 모델이 로드된다
     # (simulate_drift.py 와 같은 관례). 없으면 /predict 가 503 을 낸다.
     with TestClient(app) as client:
         for day in range(1, args.days + 1):
-            for index in range(BATCHES_PER_DAY):
-                batch_id = f"day{day:02d}_{index}"
-                batch = generate_batch(day, index, args.scenario)
-                csv_path = out_dir / f"{batch_id}.csv"
-                batch.to_csv(csv_path, index=False)
-
-                with csv_path.open("rb") as fh:
-                    response = client.post(
-                        "/predict", files={"file": (csv_path.name, fh, "text/csv")}
-                    )
-                response.raise_for_status()
-
-                record_label(
-                    batch_id=batch_id,
-                    produced_day=day,
-                    arrived_day=day + LABEL_DELAY_DAYS,
-                    label=true_label(args.scenario, day),
-                    db_path=LABELS_DB,
-                )
+            feed_day(client, day, args.scenario, out_dir)
 
             result = tick(client, state, current_day=day, scenario=args.scenario)
             print(

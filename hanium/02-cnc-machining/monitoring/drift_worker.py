@@ -224,6 +224,50 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
     )
 
 
+def main() -> None:
+    """실제 서버를 상대로 도는 독립 프로세스 진입점.
+
+    서빙(uvicorn)과 배치를 흘려보내는 feeder(simulate_timeline.py --serve-url)를
+    각각 별도 프로세스로 띄운 뒤, 이 스크립트를 세 번째 프로세스로 돌린다.
+    "오늘이 며칠째인지"는 자체 카운터가 아니라 labels.db 에 feeder 가 기록한
+    최신 produced_day 를 읽어서 안다 — 두 프로세스가 서로 다른 날짜를 셀
+    위험이 없다.
+    """
+    import argparse
+    import time
+
+    import httpx2
+
+    from monitoring.labels import get_latest_produced_day
+
+    parser = argparse.ArgumentParser(description="드리프트 감시 워커 (독립 프로세스)")
+    # simulate_timeline.py 의 PERTURBATIONS 키와 동일 — feeder 가 생성하는 시나리오.
+    parser.add_argument("scenario", choices=["temperature", "tool_wear"])
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--poll-interval", type=float, default=5.0, help="폴링 주기(초)")
+    args = parser.parse_args()
+
+    state = WorkerState()
+    last_day = 0
+
+    with httpx2.Client(base_url=args.base_url, timeout=30.0) as client:
+        print(f"감시 시작 — {args.base_url} 폴링 (주기 {args.poll_interval}초)", flush=True)
+        try:
+            while True:
+                latest_day = get_latest_produced_day(LABELS_DB)
+                if latest_day > last_day:
+                    last_day = latest_day
+                    result = tick(client, state, current_day=last_day, scenario=args.scenario)
+                    print(
+                        f"Day {last_day:02d}  score/threshold={result['ratio']:.2f}  "
+                        f"flagged={result['flagged']}  action={result['action']}",
+                        flush=True,
+                    )
+                time.sleep(args.poll_interval)
+        except KeyboardInterrupt:
+            print("감시 워커 종료", flush=True)
+
+
 def _tag(mlflow_client, run_id, scenario, day, decision, reason, extra=None) -> None:
     tags = {
         "scenario": scenario,
@@ -234,3 +278,7 @@ def _tag(mlflow_client, run_id, scenario, day, decision, reason, extra=None) -> 
     }
     for key, value in tags.items():
         mlflow_client.set_tag(run_id, key, value)
+
+
+if __name__ == "__main__":
+    main()

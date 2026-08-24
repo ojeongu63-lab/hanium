@@ -52,3 +52,15 @@ def get_arrived_labels(current_day: int, db_path: Path) -> list[dict]:
         {"batch_id": r[0], "produced_day": r[1], "arrived_day": r[2], "label": r[3]}
         for r in rows
     ]
+
+
+def get_latest_produced_day(db_path: Path) -> int:
+    """지금까지 생산된 배치 중 가장 늦은 날짜. 독립 프로세스로 도는 감시
+    워커가 "오늘이 며칠째인지"를 이 DB에 물어봐서 안다 — feeder 프로세스가
+    쓰는 것과 같은 카운터를 공유해 두 프로세스가 어긋나지 않는다."""
+    if not Path(db_path).exists():
+        return 0
+    conn = _connect(db_path)
+    row = conn.execute("SELECT MAX(produced_day) FROM qc_labels").fetchone()
+    conn.close()
+    return row[0] or 0
