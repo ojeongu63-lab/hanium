@@ -6,6 +6,7 @@ on:
     paths: ['hanium/02-cnc-machining/**']
   pull_request:
     paths: ['hanium/02-cnc-machining/**']
+  workflow_dispatch: {}
 
 jobs:
   test:
