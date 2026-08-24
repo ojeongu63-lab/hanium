@@ -223,8 +223,64 @@ Day 37 시점 라벨은 Day 30까지 도착한다. 표본 20은 Day 26~30(champi
 
 ## 남은 작업
 
-- [ ] `drift_worker.py`에 독립 실행 진입점(`main`) — 현재는 `tick()`만 있어
-      `simulate_timeline.py`가 같은 프로세스에서 호출한다. 선택한 구조가
-      "별도 감시 워커 프로세스"였으므로 실제 서버를 폴링하는 실행 스크립트가 필요.
+- [x] `drift_worker.py`에 독립 실행 진입점(`main`) — 완료 (2026-08-24)
 - [ ] `README.md`에 자동 재학습 루프 실행법 추가 (현재 언급 0건)
 - [ ] `main` 브랜치 머지
+
+## 리뷰 — 독립 실행 진입점 (2026-08-24)
+
+기존엔 `simulate_timeline.py` 하나가 `TestClient`로 배치 주입과 감시(`tick()`)를
+같은 프로세스에서 다 했다. 선택한 구조("별도 감시 워커 프로세스")를 실제로
+만족하려면 배치를 실제 서버에 흘리는 쪽(feeder)과 감시하는 쪽(worker)이 각각
+독립된 OS 프로세스여야 한다 — 완전 분리로 진행(사용자 선택).
+
+**막힌 문제**: 워커가 실제 프로세스로 분리되면 "오늘이 며칠째인지"를 어디서
+아는가? feeder의 내부 카운터에 접근할 수 없다. 해결: `labels.db`(이미 두
+프로세스가 공유하는 SQLite)에 `get_latest_produced_day()`를 신설해, 워커가
+매 폴링마다 "feeder가 지금까지 기록한 최신 produced_day"를 물어보게 했다.
+두 프로세스가 서로 다른 날짜를 셀 위험이 없다.
+
+**변경 파일**:
+- `src/monitoring/labels.py` — `get_latest_produced_day(db_path) -> int` 추가
+  (TDD, 테스트 2개: 최댓값 추적 / DB 없을 때 0)
+- `monitoring/simulate_timeline.py` — `--serve-url` 옵션 추가. 지정하면
+  `TestClient` 대신 진짜 HTTP(`httpx2.Client`)로 배치만 흘리고 `tick()`은
+  호출하지 않는다(별도 프로세스가 감시하므로). 생략 시 기존 동작 그대로라
+  기록된 시나리오 A/B 재현 커맨드는 안 바뀐다.
+- `monitoring/drift_worker.py` — `main()` 추가. 실제 서버를 `httpx2.Client`로
+  폴링하며, `get_latest_produced_day()`가 마지막으로 처리한 날보다 커지면
+  `tick()`을 호출한다.
+
+**실행법** (세 터미널):
+```bash
+uv run uvicorn src.serving.app:app --app-dir . --port 8000
+uv run python monitoring/simulate_timeline.py temperature --serve-url http://127.0.0.1:8000
+uv run python monitoring/drift_worker.py temperature --base-url http://127.0.0.1:8000 --poll-interval 5
+```
+
+**실행 중 발견한 버그 2건 (구현 중 수정)**:
+1. `main()`을 정의만 하고 `if __name__ == "__main__": main()` 가드를 빠뜨려
+   스크립트로 실행해도 아무 일도 안 일어났다. 스모크 테스트에서 발견.
+2. `import drift_worker`가 mlflow/torch 로딩 때문에 약 7초 걸린다는 걸 모르고
+   첫 스모크에서 `timeout 5`를 줘서 매번 죽었다 — "워커가 멈췄다"로 오인할
+   뻔했다. 타임아웃을 넉넉히 주니 정상 작동.
+
+**스모크 테스트로 확인한 설계상 제약 (버그 아님, 운영 규칙)**: `labels.db`는
+`qc_labels` 테이블에 시나리오 구분 컬럼이 없다. 이전 시나리오 실행분이 DB에
+남은 채로 새 시나리오를 얹으면 `get_latest_produced_day()`가 옛 시나리오의
+최댓값(예: 40)을 그대로 돌려줘 워커가 첫 폴링부터 엉뚱한 날짜로 튄다. 실제로
+스모크 중 재현했다. **시나리오를 바꿔 실행하기 전엔 반드시 `labels.db`를
+비울 것** — 기존에도 있던 제약이고 이번에 새로 생긴 게 아니다.
+
+**검증**: uvicorn(포트 8010, `nice -n 19`)을 띄우고 feeder 3일 → 워커가 실제
+HTTP로 폴링해 Day 01~03을 순서대로 감지, 매번 `flagged=False action=none`
+(Day 1~9는 `DRIFT_START_DAY=10` 이전이라 변형이 없어 트리거가 절대 안 걸리는
+안전한 구간 — champion과 MLflow run 수는 스모크 전후 불변 확인). 스모크가
+남긴 `labels.db`/`requests.db`/`data/timeline/temperature`는 백업에서 복원 및
+삭제로 원상복구. 전체 테스트 141개 통과(신규 2개 포함).
+
+부수 발견(고치지 않음, 범위 밖): `tests/serving/test_app.py`의 예측 테스트
+일부가 `DB_PATH`를 monkeypatch하지 않아 `uv run pytest`를 돌릴 때마다 실제
+`data/monitoring/requests.db`에 요청 2건이 실기록된다. 이번에 두 번 발견해
+직접 지워 복구했다. 기존 테스트 위생 문제이고 이번 작업 범위 밖이라 손대지
+않았다.
