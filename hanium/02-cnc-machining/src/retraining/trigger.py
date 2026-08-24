@@ -22,3 +22,14 @@ def should_retrain(
     if len(flag_history) < consecutive_k:
         return False
     return all(flag_history[-consecutive_k:])
+
+
+def days_to_process(last_day: int, latest_day: int) -> list[int]:
+    """감시 워커가 이번 폴링에서 순서대로 처리해야 할 날짜들.
+
+    폴링 간격보다 feeder 가 배치를 빨리 흘려보내면 여러 날짜가 한 번의
+    폴링 사이에 지나가 버린다. 최신 날짜만 보고 건너뛰면 중간 날짜의
+    tick 이 통째로 빠져 flag_history 의 연속성이 깨진다(실측으로 확인:
+    Day 2 다음 Day 4가 찍히고 Day 3 이 사라짐) — 그래서 하나씩 다 돌려준다.
+    """
+    return list(range(last_day + 1, latest_day + 1))

@@ -24,7 +24,7 @@ from lstm_ae.tracking import (  # noqa: E402
 from retraining.gate import evaluate_gate  # noqa: E402
 from retraining.promotion import swap_with_rollback, verify_serving_contract  # noqa: E402
 from retraining.runner import run_retraining  # noqa: E402
-from retraining.trigger import is_drift_flagged, should_retrain  # noqa: E402
+from retraining.trigger import days_to_process, is_drift_flagged, should_retrain  # noqa: E402
 
 LABELS_DB = ROOT / "data" / "monitoring" / "labels.db"
 REQUESTS_DB = ROOT / "data" / "monitoring" / "requests.db"
@@ -255,14 +255,14 @@ def main() -> None:
         try:
             while True:
                 latest_day = get_latest_produced_day(LABELS_DB)
-                if latest_day > last_day:
-                    last_day = latest_day
-                    result = tick(client, state, current_day=last_day, scenario=args.scenario)
+                for day in days_to_process(last_day, latest_day):
+                    result = tick(client, state, current_day=day, scenario=args.scenario)
                     print(
-                        f"Day {last_day:02d}  score/threshold={result['ratio']:.2f}  "
+                        f"Day {day:02d}  score/threshold={result['ratio']:.2f}  "
                         f"flagged={result['flagged']}  action={result['action']}",
                         flush=True,
                     )
+                    last_day = day
                 time.sleep(args.poll_interval)
         except KeyboardInterrupt:
             print("감시 워커 종료", flush=True)
