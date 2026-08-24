@@ -3,16 +3,16 @@ name: CNC tests
 on:
   push:
     branches: [main]
-    paths: ['02-cnc-machining/**']
+    paths: ['hanium/02-cnc-machining/**']
   pull_request:
-    paths: ['02-cnc-machining/**']
+    paths: ['hanium/02-cnc-machining/**']
 
 jobs:
   test:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: 02-cnc-machining
+        working-directory: hanium/02-cnc-machining
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
