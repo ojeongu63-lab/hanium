@@ -187,6 +187,52 @@ nice -n 19 uv run python synthetic/generate_synthetic.py
 curl -s -X POST "http://127.0.0.1:8899/predict" -F "file=@synthetic/scenarios/tool_wear.csv"
 ```
 
+### 2-7. 드리프트 트리거 자동 재학습 (참고용, 데모 시연)
+
+실제로 데이터가 들어오고 결과가 나가는 환경에서 시간이 지나며 입력 분포가
+서서히 틀어질 때(계절·온도 변화, 설비 마모 등) 드리프트를 감지해 자동으로
+재학습하고, 안전할 때만 승격하는 루프. 구조는 "트리거 → 재학습"이 아니라
+**"트리거 → 재학습 → 게이트 → 승격 또는 거부"** — 같은 드리프트 신호가 정반대
+원인(설비가 실제로 망가짐)에서도 나오므로, 원본 eval 성능 유지(G1)와 라벨
+도착 구간 정확도 개선(G2)을 둘 다 확인한 뒤에만 승격한다. 설계 전체는
+[`docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md`](docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md) 참고.
+
+보유 데이터(25개 실험)에는 시간축이 없어서, 가상 운영 타임라인을 합성해
+시연한다. 서빙과 감시를 프로세스로 분리해서 돌린다 — 한 프로세스에 섞으면
+학습이 추론 응답을 지연시키는 안티패턴이 되기 때문:
+
+```bash
+# 터미널 1 — 서빙
+cd 02-cnc-machining
+nice -n 19 uv run uvicorn src.serving.app:app --app-dir . --port 8000
+
+# 터미널 2 — 감시 워커 (실제 서버를 폴링, 드리프트 잡히면 재학습·게이트·승격까지)
+cd 02-cnc-machining
+nice -n 19 uv run python monitoring/drift_worker.py temperature --base-url http://127.0.0.1:8000 --poll-interval 5
+
+# 터미널 3 — feeder (가상 운영 배치를 실제 서버에 흘려보냄)
+cd 02-cnc-machining
+nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 --serve-url http://127.0.0.1:8000
+```
+
+- 시나리오는 `temperature`(온도·계절 — 제품은 정상, 재학습이 정답) /
+  `tool_wear`(공구마모 — 실제로 불량, 게이트가 막아야 함) 둘 중 선택.
+- Day 1~9는 변형이 없는 baseline 구간이라 트리거가 걸리지 않는다(정상
+  동작). 트리거는 Day 10 이후 연속 3회 flagged부터, 실제로는 Day 17~부터
+  관측됨.
+- **`labels.db`/`requests.db`는 시나리오 구분 컬럼이 없다.** 다른 시나리오를
+  실행했던 직후라면 반드시 먼저 비울 것 — 안 비우면 감시 워커가 이전
+  실행의 최신 날짜를 그대로 이어받아 엉뚱하게 동작한다:
+  ```bash
+  rm -f data/monitoring/labels.db data/monitoring/requests.db
+  rm -rf data/timeline/<이전에 돌렸던 시나리오>
+  ```
+- `--serve-url` 없이 `simulate_timeline.py`만 단독 실행하면(터미널 2·3
+  불필요) 기존처럼 한 프로세스 안에서 `TestClient`로 배치 주입과 감시를
+  함께 한다 — 실측 시나리오 A/B 재현에 쓴 방식이 이것이다.
+- 진행 경과와 실측 결과(시나리오 A: 승격, 시나리오 B: 5회 모두 거부)는
+  [`../tasks/todo.md`](../tasks/todo.md)에 기록돼 있다.
+
 ## 3. WSL에서 Windows 브라우저로 접속이 안 될 때
 
 - 기본은 `http://localhost:<port>` 또는 `http://127.0.0.1:<port>`로 바로 열림
@@ -217,7 +263,8 @@ curl -s -X POST "http://127.0.0.1:8899/predict" -F "file=@synthetic/scenarios/to
 | `src/lstm_ae/` | LSTM-Autoencoder 모델·학습·채점, `tracking.py`(MLflow 설정) |
 | `src/serving/` | 추론 로직(`inference.py`) + FastAPI 앱(`app.py`) |
 | `src/rag/` | RAG 검색(`retrieval.py`) + 생성(`generation.py`) + 오케스트레이션(`guide.py`) |
-| `src/monitoring/` | 드리프트 계산(`drift.py`), 요청 로깅, MLflow 지표 기록 |
+| `src/monitoring/` | 드리프트 계산(`drift.py`), 요청 로깅, MLflow 지표 기록, QC 라벨 지연 도착(`labels.py`) |
+| `src/retraining/` | 재학습 트리거(`trigger.py`), 데이터 구성·실행(`runner.py`), 승격 게이트(`gate.py`), 안전한 파일 교체(`promotion.py`) — §2-7 |
 
 ### 실행 스크립트 + 결과물
 
@@ -228,7 +275,7 @@ curl -s -X POST "http://127.0.0.1:8899/predict" -F "file=@synthetic/scenarios/to
 | `loocv/` | 정상 실험 LOOCV 검증 (§2-5) | `loocv/summary.{json,csv}` |
 | `synthetic/` | 데모용 합성 이상 시나리오 생성 (§2-6) | `synthetic/scenarios/*.csv` |
 | `augmentation/` | 희소 샘플 증강 실험 | `augmentation/combined_dataset/` (git 제외) |
-| `monitoring/` | 드리프트 상황 시뮬레이션 | 콘솔 출력 |
+| `monitoring/` | 드리프트 시뮬레이션 + 자동 재학습 감시 워커 (§2-7) | `data/timeline/`, `data/monitoring/` |
 
 `loocv/`, `synthetic/`, `augmentation/`, `monitoring/`은 **검증·실험용이라 서빙
 경로에 영향을 주지 않는다.** 서버를 띄우고 `/predict`를 쓰는 데는 `src/`,
