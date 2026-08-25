@@ -21,6 +21,7 @@ from lstm_ae.tracking import CHAMPION_ALIAS, REGISTERED_MODEL_NAME, configure_tr
 from monitoring.drift import compute_drift_status
 from monitoring.logging import count_requests, get_recent_requests, log_request
 from monitoring.mlflow_logging import log_drift_metrics
+from monitoring.shadow_log import record_shadow_prediction
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 from serving.inference import predict_experiment, scale_features
 
@@ -191,6 +192,9 @@ async def predict(
         scaled = scale_features(df, FEATURE_COLUMNS, state.scaler_dict)
         feature_means = scaled[FEATURE_COLUMNS].mean().to_dict()
         log_request(feature_means, result["score"], result["predicted_label_text"], DB_PATH)
+
+        if _shadow_state is not None:
+            _record_shadow_if_possible(df, method, result["predicted_label_text"], file.filename)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
@@ -198,6 +202,28 @@ async def predict(
         "model_version": state.model_version,
         "mlflow_run_id": state.mlflow_run_id,
     }
+
+
+def _record_shadow_if_possible(df, method, champion_label, filename) -> None:
+    """섀도우 후보 추론이 실패해도 사용자 응답에는 영향을 주면 안 된다."""
+    try:
+        shadow_result = predict_experiment(
+            df=df,
+            model=_shadow_state.model,
+            feature_columns=FEATURE_COLUMNS,
+            scaler_dict=_shadow_state.scaler_dict,
+            window_size=_shadow_state.window_size,
+            threshold=_shadow_state.thresholds[method],
+            method=method,
+            feature_baseline=_shadow_state.feature_baseline,
+            exclude_from_ranking=SETUP_CONSTANT_COLUMNS,
+        )
+        batch_id = Path(filename).stem
+        record_shadow_prediction(
+            batch_id, champion_label, shadow_result["predicted_label_text"], SHADOW_DB
+        )
+    except Exception as exc:
+        print(f"섀도우 추론 실패(무시하고 계속): {exc}")
 
 
 @app.get("/drift-status")

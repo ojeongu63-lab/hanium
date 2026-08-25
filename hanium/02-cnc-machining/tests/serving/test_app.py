@@ -302,3 +302,53 @@ def test_stop_shadow_clears_state(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"status": "shadow_stopped"}
     assert app_module._shadow_state is None
+
+
+def test_predict_logs_shadow_prediction_when_shadow_active(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    monkeypatch.setattr(app_module, "SHADOW_DB", tmp_path / "shadow.db")
+    monkeypatch.setattr(app_module, "_shadow_state", _fake_state(window_size=6))
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    response = client.post(
+        "/predict",
+        files={"file": ("day37_0.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert "candidate_label" not in response.json()
+
+    from monitoring.shadow_log import get_shadow_predictions
+    recorded = get_shadow_predictions(["day37_0"], tmp_path / "shadow.db")
+    assert "day37_0" in recorded
+    assert recorded["day37_0"]["champion_label"] == response.json()["predicted_label_text"]
+
+
+def test_predict_succeeds_even_if_shadow_inference_fails(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    monkeypatch.setattr(app_module, "SHADOW_DB", tmp_path / "shadow.db")
+
+    class _BrokenShadow:
+        model = None
+        scaler_dict = {}
+        window_size = 6
+        thresholds = {"mean": 1.0}
+        feature_baseline = {}
+
+    monkeypatch.setattr(app_module, "_shadow_state", _BrokenShadow())
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    response = client.post(
+        "/predict",
+        files={"file": ("day37_0.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    )
+
+    assert response.status_code == 200
