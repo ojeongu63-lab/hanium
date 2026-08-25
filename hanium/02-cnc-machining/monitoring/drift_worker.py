@@ -58,8 +58,10 @@ class ShadowState:
     run_id: str
     retrain_dir: str
     missed: int                   # 트리거 시점 G1 놓친 개수 — 승격 확정 시 champion_missed 갱신용
-    start_day: int
-    labels_seen_at_start: int     # 섀도우 시작 시점까지 이미 도착해 있던 라벨 수
+    start_day: int                # 섀도우가 시작된 날 — 이후 "생산된" 배치만 진짜 관찰 대상이다.
+                                    # 라벨 지연(7일) 때문에 "새로 도착한 라벨"은 여전히 섀도우
+                                    # 시작 이전 생산분을 가리킬 수 있어, 도착 순서가 아니라
+                                    # produced_day로 걸러야 한다(실측으로 발견).
 
 
 @dataclass
@@ -141,19 +143,15 @@ def _decide_and_start_shadow(client, state, result, current_day, scenario) -> st
 
 
 def _start_shadow(client, state, result, current_day) -> None:
-    from monitoring.labels import get_arrived_labels
-
     client.post(
         "/start-shadow", json={"model_version": str(result["model_version"])}
     ).raise_for_status()
-    labels_seen = len(get_arrived_labels(current_day, LABELS_DB))
     state.shadow = ShadowState(
         candidate_version=str(result["model_version"]),
         run_id=result["run_id"],
         retrain_dir=str(result["retrain_dir"]),
         missed=result["missed"],
         start_day=current_day,
-        labels_seen_at_start=labels_seen,
     )
     print(
         f"  섀도우 시작 — version {result['model_version']} "
@@ -243,7 +241,11 @@ def _check_shadow(client, state, current_day, scenario) -> str:
     from retraining.gate import accuracy_from_pairs
 
     arrived = get_arrived_labels(current_day, LABELS_DB)
-    new_labels = arrived[state.shadow.labels_seen_at_start :]
+    # 라벨은 생산일 기준으로 지연 도착하므로, "새로 도착한 라벨"이 아니라
+    # "섀도우 시작 이후에 생산된 배치"만 관찰 대상이다 — 그 이전 생산분은
+    # 섀도우가 활성화되기 전에 이미 /predict 를 통과해 shadow_predictions에
+    # 기록이 없다.
+    new_labels = [r for r in arrived if r["produced_day"] > state.shadow.start_day]
     if len(new_labels) < GATE_SAMPLE_SIZE:
         return "shadow_pending"
 

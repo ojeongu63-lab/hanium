@@ -151,18 +151,33 @@ def main() -> None:
         "drift_worker.py 가 폴링한다. 생략하면 기존처럼 TestClient로 이 "
         "프로세스 안에서 감시까지 함께 한다.",
     )
+    parser.add_argument(
+        "--pace-seconds",
+        type=float,
+        default=0.0,
+        help="--serve-url 과 함께 쓸 때, 하루치 배치를 보낸 뒤 이만큼 쉰다. "
+        "0(기본값)이면 최대한 빨리 다 쏴버리는데, 그러면 워커가 재학습(수십 초"
+        "~분)으로 뒤처지는 사이 feeder 가 이미 끝나버려 섀도우가 관찰할 미래 "
+        "트래픽이 하나도 안 남는다(실측으로 확인된 문제) — 섀도우 검증 시에는 "
+        "워커의 트리거 간격(재학습 4회 기준 실측 약 2분)보다 feeder 완주 시간이 "
+        "짧지 않도록 넉넉히 줘야 한다.",
+    )
     args = parser.parse_args()
 
     out_dir = ROOT / "data" / "timeline" / args.scenario
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.serve_url:
+        import time
+
         import httpx2
 
         with httpx2.Client(base_url=args.serve_url, timeout=30.0) as client:
             for day in range(1, args.days + 1):
                 feed_day(client, day, args.scenario, out_dir)
                 print(f"Day {day:02d}  {BATCHES_PER_DAY}개 배치 전송 완료", flush=True)
+                if args.pace_seconds:
+                    time.sleep(args.pace_seconds)
         return
 
     from fastapi.testclient import TestClient
