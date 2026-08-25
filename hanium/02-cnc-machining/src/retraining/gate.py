@@ -52,3 +52,14 @@ def accuracy_from_pairs(truths: list[str], predictions: list[str]) -> float:
         )
     hits = sum(1 for truth, pred in zip(truths, predictions) if truth == pred)
     return hits / len(truths)
+
+
+def evaluate_shadow(candidate_accuracy: float, champion_accuracy: float) -> dict:
+    """섀도우 기간 종료 후 최종 판정. G1은 트리거 시점에 이미 확인했고
+    원본 eval은 시간이 지나도 안 바뀌므로 재확인하지 않는다 — G2에
+    해당하는 정확도 비교만 반복한다."""
+    promoted = candidate_accuracy > champion_accuracy
+    return {
+        "decision": "promoted" if promoted else "rejected",
+        "accuracy_delta": candidate_accuracy - champion_accuracy,
+    }

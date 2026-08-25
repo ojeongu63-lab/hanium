@@ -1,6 +1,6 @@
 import pytest
 
-from retraining.gate import accuracy_from_pairs, evaluate_gate
+from retraining.gate import accuracy_from_pairs, evaluate_gate, evaluate_shadow
 
 # 현 champion 은 eval 불량 11개 중 10개를 잡는다 → 1건 놓침.
 CHAMPION_MISSED = 1
@@ -110,3 +110,15 @@ def test_accuracy_from_pairs_all_correct():
 def test_accuracy_from_pairs_rejects_length_mismatch():
     with pytest.raises(ValueError, match="길이가 다릅니다"):
         accuracy_from_pairs(["good", "bad"], ["good"])
+
+
+def test_shadow_promotes_when_candidate_better():
+    verdict = evaluate_shadow(candidate_accuracy=0.9, champion_accuracy=0.7)
+    assert verdict["decision"] == "promoted"
+    assert verdict["accuracy_delta"] == pytest.approx(0.2)
+
+
+def test_shadow_rejects_when_candidate_not_better():
+    verdict = evaluate_shadow(candidate_accuracy=0.7, champion_accuracy=0.7)
+    assert verdict["decision"] == "rejected"
+    assert verdict["accuracy_delta"] == pytest.approx(0.0)
