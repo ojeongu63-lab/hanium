@@ -21,7 +21,7 @@ from lstm_ae.tracking import (  # noqa: E402
     REGISTERED_MODEL_NAME,
     promote_to_champion,
 )
-from retraining.gate import evaluate_gate  # noqa: E402
+from retraining.gate import evaluate_gate, evaluate_shadow  # noqa: E402
 from retraining.promotion import swap_with_rollback, verify_serving_contract  # noqa: E402
 from retraining.runner import run_retraining  # noqa: E402
 from retraining.trigger import days_to_process, is_drift_flagged, should_retrain  # noqa: E402
@@ -31,6 +31,7 @@ REQUESTS_DB = ROOT / "data" / "monitoring" / "requests.db"
 MODEL_DIR = ROOT / "data" / "model"
 SCALER_PATH = ROOT / "data" / "processed" / "scaler.json"
 BACKUP_ROOT = ROOT / "data" / "model_backup"
+SHADOW_DB = ROOT / "data" / "monitoring" / "shadow.db"
 COOLDOWN_DAYS = 5
 CONSECUTIVE_K = 3
 # G2 평가에 쓸 최근 라벨 도착 배치 수(= 최근 4일치). 두 모델을 전부 재추론하므로
@@ -52,11 +53,22 @@ GATE_SAMPLE_SIZE = 20
 
 
 @dataclass
+class ShadowState:
+    candidate_version: str
+    run_id: str
+    retrain_dir: str
+    missed: int                   # 트리거 시점 G1 놓친 개수 — 승격 확정 시 champion_missed 갱신용
+    start_day: int
+    labels_seen_at_start: int     # 섀도우 시작 시점까지 이미 도착해 있던 라벨 수
+
+
+@dataclass
 class WorkerState:
     flag_history: list[bool] = field(default_factory=list)
     cooldown_remaining: int = 0
     champion_missed: int = 1                # 현 champion 실측 — 불량 11개 중 1개 놓침
     champion_accuracy: float = 0.0          # 첫 게이트 평가 시 측정값으로 대체
+    shadow: ShadowState | None = None
 
 
 def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
@@ -67,6 +79,10 @@ def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
 
     if state.cooldown_remaining > 0:
         state.cooldown_remaining -= 1
+
+    if state.shadow is not None:
+        action = _check_shadow(client, state, current_day, scenario)
+        return {"ratio": ratio, "flagged": flagged, "action": action}
 
     if not should_retrain(state.flag_history, CONSECUTIVE_K, state.cooldown_remaining):
         return {"ratio": ratio, "flagged": flagged, "action": "none"}
@@ -80,11 +96,11 @@ def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
     )
     state.cooldown_remaining = COOLDOWN_DAYS
 
-    decision = _decide_and_promote(client, state, result, current_day, scenario)
-    return {"ratio": ratio, "flagged": flagged, "action": decision}
+    action = _decide_and_start_shadow(client, state, result, current_day, scenario)
+    return {"ratio": ratio, "flagged": flagged, "action": action}
 
 
-def _decide_and_promote(client, state, result, current_day, scenario) -> str:
+def _decide_and_start_shadow(client, state, result, current_day, scenario) -> str:
     mlflow_client = MlflowClient()
     run = mlflow_client.get_run(result["run_id"])
 
@@ -120,34 +136,30 @@ def _decide_and_promote(client, state, result, current_day, scenario) -> str:
         print(f"  거부 — {verdict['reject_reason']}  (champion 유지, 사람 확인 필요)", flush=True)
         return "rejected"
 
-    previous_version = mlflow_client.get_model_version_by_alias(
-        REGISTERED_MODEL_NAME, CHAMPION_ALIAS
-    ).version
+    _start_shadow(client, state, result, current_day)
+    return "shadow_started"
 
-    def _promote() -> None:
-        promote_to_champion(result["model_version"])
-        client.post("/reload-model").raise_for_status()
 
-    def _verify() -> None:
-        health = client.get("/health").json()
-        if health["model_version"] != str(result["model_version"]):
-            raise RuntimeError(f"리로드 후 버전 불일치: {health['model_version']}")
+def _start_shadow(client, state, result, current_day) -> None:
+    from monitoring.labels import get_arrived_labels
 
-    try:
-        swap_with_rollback(
-            result["retrain_dir"], MODEL_DIR, SCALER_PATH, BACKUP_ROOT,
-            promote=_promote, verify=_verify,
-        )
-    except Exception as exc:
-        # 파일은 swap_with_rollback 이 되돌렸다. alias 와 서빙 상태만 마저 되돌린다.
-        print(f"  승격 실패, 롤백 중: {exc}", flush=True)
-        promote_to_champion(previous_version)
-        client.post("/reload-model")
-        raise
-
-    state.champion_missed = result["missed"]
-    print(f"  승격 완료 — version {result['model_version']}", flush=True)
-    return "promoted"
+    client.post(
+        "/start-shadow", json={"model_version": str(result["model_version"])}
+    ).raise_for_status()
+    labels_seen = len(get_arrived_labels(current_day, LABELS_DB))
+    state.shadow = ShadowState(
+        candidate_version=str(result["model_version"]),
+        run_id=result["run_id"],
+        retrain_dir=str(result["retrain_dir"]),
+        missed=result["missed"],
+        start_day=current_day,
+        labels_seen_at_start=labels_seen,
+    )
+    print(
+        f"  섀도우 시작 — version {result['model_version']} "
+        f"(라벨 {GATE_SAMPLE_SIZE}건 도착까지 관찰)",
+        flush=True,
+    )
 
 
 def _predict_labels(batch_paths, model, scaler_dict, threshold, baseline, window_size):
@@ -222,6 +234,89 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
         accuracy_from_pairs(truths, retrained_preds),
         len(truths),
     )
+
+
+def _check_shadow(client, state, current_day, scenario) -> str:
+    """섀도우가 끝났는지 확인하고, 끝났으면 최종 판정까지 수행한다."""
+    from monitoring.labels import get_arrived_labels
+    from monitoring.shadow_log import get_shadow_predictions
+    from retraining.gate import accuracy_from_pairs
+
+    arrived = get_arrived_labels(current_day, LABELS_DB)
+    new_labels = arrived[state.shadow.labels_seen_at_start :]
+    if len(new_labels) < GATE_SAMPLE_SIZE:
+        return "shadow_pending"
+
+    sample = new_labels[:GATE_SAMPLE_SIZE]
+    batch_ids = [r["batch_id"] for r in sample]
+    predictions = get_shadow_predictions(batch_ids, SHADOW_DB)
+
+    matched = [b for b in batch_ids if b in predictions]
+    if len(matched) < GATE_SAMPLE_SIZE:
+        # /predict 가 이 배치들을 아직 다 처리하지 못했을 수 있다 — 다음 tick에 재시도.
+        return "shadow_pending"
+
+    label_by_batch = {r["batch_id"]: r["label"] for r in sample}
+    truths = [label_by_batch[b] for b in matched]
+    champion_preds = [predictions[b]["champion_label"] for b in matched]
+    candidate_preds = [predictions[b]["candidate_label"] for b in matched]
+
+    champion_accuracy = accuracy_from_pairs(truths, champion_preds)
+    candidate_accuracy = accuracy_from_pairs(truths, candidate_preds)
+    verdict = evaluate_shadow(candidate_accuracy, champion_accuracy)
+
+    mlflow_client = MlflowClient()
+    _tag(mlflow_client, state.shadow.run_id, scenario, current_day,
+         decision=f"shadow_{verdict['decision']}", reason="",
+         extra={"shadow_accuracy_delta": verdict["accuracy_delta"],
+                "shadow_candidate_accuracy": candidate_accuracy,
+                "shadow_champion_accuracy": champion_accuracy})
+
+    print(f"  섀도우 종료 — candidate {candidate_accuracy:.2f} vs champion "
+          f"{champion_accuracy:.2f} → {verdict['decision']}", flush=True)
+
+    if verdict["decision"] == "promoted":
+        _promote_shadow(client, state)
+        result_action = "promoted"
+    else:
+        client.post("/stop-shadow")
+        print("  섀도우 거부 — champion 유지, 사람 확인 필요", flush=True)
+        result_action = "shadow_rejected"
+
+    state.shadow = None
+    return result_action
+
+
+def _promote_shadow(client, state) -> None:
+    mlflow_client = MlflowClient()
+    previous_version = mlflow_client.get_model_version_by_alias(
+        REGISTERED_MODEL_NAME, CHAMPION_ALIAS
+    ).version
+
+    def _promote() -> None:
+        promote_to_champion(state.shadow.candidate_version)
+        client.post("/reload-model").raise_for_status()
+
+    def _verify() -> None:
+        health = client.get("/health").json()
+        if health["model_version"] != state.shadow.candidate_version:
+            raise RuntimeError(f"리로드 후 버전 불일치: {health['model_version']}")
+
+    try:
+        swap_with_rollback(
+            state.shadow.retrain_dir, MODEL_DIR, SCALER_PATH, BACKUP_ROOT,
+            promote=_promote, verify=_verify,
+        )
+    except Exception as exc:
+        print(f"  승격 실패, 롤백 중: {exc}", flush=True)
+        promote_to_champion(previous_version)
+        client.post("/reload-model")
+        client.post("/stop-shadow")
+        raise
+
+    client.post("/stop-shadow")
+    state.champion_missed = state.shadow.missed
+    print(f"  승격 완료 — version {state.shadow.candidate_version}", flush=True)
 
 
 def main() -> None:
