@@ -26,6 +26,7 @@ from serving.inference import predict_experiment, scale_features
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = ROOT / "data" / "monitoring" / "requests.db"
+SHADOW_DB = ROOT / "data" / "monitoring" / "shadow.db"
 DRIFT_WINDOW_SIZE = 10
 
 
@@ -44,6 +45,7 @@ class ModelState:
 
 
 _state: ModelState | None = None
+_shadow_state: ModelState | None = None
 
 
 def load_rag_state() -> tuple[list[dict] | None, object | None, object | None]:
@@ -79,12 +81,7 @@ def load_companion_json(run_id: str, name: str, fallback: Path) -> dict:
         return json.loads(fallback.read_text())
 
 
-def load_model_state() -> ModelState:
-    configure_tracking()
-    client = MlflowClient()
-    mv = client.get_model_version_by_alias(REGISTERED_MODEL_NAME, CHAMPION_ALIAS)
-    model = mlflow.pytorch.load_model(f"models:/{REGISTERED_MODEL_NAME}@{CHAMPION_ALIAS}")
-    run = client.get_run(mv.run_id)
+def _build_model_state(mv, run, model, include_rag: bool) -> ModelState:
     thresholds = {
         method: run.data.metrics[f"{method}_threshold"] for method in ["mean", "max", "p95"]
     }
@@ -95,7 +92,9 @@ def load_model_state() -> ModelState:
     feature_baseline = load_companion_json(
         mv.run_id, "feature_baseline.json", ROOT / "data" / "model" / "feature_baseline.json"
     )
-    rag_corpus, rag_index, openai_client = load_rag_state()
+    rag_corpus, rag_index, openai_client = (
+        load_rag_state() if include_rag else (None, None, None)
+    )
     return ModelState(
         model=model,
         scaler_dict=scaler_dict,
@@ -108,6 +107,27 @@ def load_model_state() -> ModelState:
         rag_index=rag_index,
         openai_client=openai_client,
     )
+
+
+def load_model_state() -> ModelState:
+    configure_tracking()
+    client = MlflowClient()
+    mv = client.get_model_version_by_alias(REGISTERED_MODEL_NAME, CHAMPION_ALIAS)
+    model = mlflow.pytorch.load_model(f"models:/{REGISTERED_MODEL_NAME}@{CHAMPION_ALIAS}")
+    run = client.get_run(mv.run_id)
+    return _build_model_state(mv, run, model, include_rag=True)
+
+
+def load_candidate_state(version: str) -> ModelState:
+    """섀도우 후보를 champion alias 없이 특정 버전으로 직접 로드한다 —
+    승격 전이라 champion alias는 아직 candidate를 안 가리킨다. RAG는
+    섀도우 추론(로그 기록용)에는 필요 없어 안 채운다."""
+    configure_tracking()
+    client = MlflowClient()
+    mv = client.get_model_version(REGISTERED_MODEL_NAME, version)
+    model = mlflow.pytorch.load_model(f"models:/{REGISTERED_MODEL_NAME}/{version}")
+    run = client.get_run(mv.run_id)
+    return _build_model_state(mv, run, model, include_rag=False)
 
 
 @asynccontextmanager
@@ -205,3 +225,17 @@ def reload_model() -> dict:
         _state = previous
         raise HTTPException(status_code=500, detail=f"모델 리로드 실패, 기존 모델 유지: {exc}")
     return {"status": "reloaded", "model_version": _state.model_version}
+
+
+@app.post("/start-shadow")
+def start_shadow(payload: dict) -> dict:
+    global _shadow_state
+    _shadow_state = load_candidate_state(payload["model_version"])
+    return {"status": "shadow_started", "candidate_version": _shadow_state.model_version}
+
+
+@app.post("/stop-shadow")
+def stop_shadow() -> dict:
+    global _shadow_state
+    _shadow_state = None
+    return {"status": "shadow_stopped"}

@@ -274,3 +274,31 @@ def test_companion_json_prefers_mlflow_artifact(tmp_path, monkeypatch):
     result = app_module.load_companion_json("run-with-artifact", "scaler.json", fallback)
 
     assert result == {"from": "artifact"}
+
+
+def test_start_shadow_loads_candidate_state(monkeypatch):
+    import serving.app as app_module
+
+    candidate = _fake_state()
+    candidate.model_version = "99"
+    monkeypatch.setattr(app_module, "load_candidate_state", lambda version: candidate)
+    client = TestClient(app)
+
+    response = client.post("/start-shadow", json={"model_version": "99"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "shadow_started", "candidate_version": "99"}
+    assert app_module._shadow_state is candidate
+
+
+def test_stop_shadow_clears_state(monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "_shadow_state", _fake_state())
+    client = TestClient(app)
+
+    response = client.post("/stop-shadow")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "shadow_stopped"}
+    assert app_module._shadow_state is None
