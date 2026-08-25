@@ -143,19 +143,29 @@ def _decide_and_start_shadow(client, state, result, current_day, scenario) -> st
 
 
 def _start_shadow(client, state, result, current_day) -> None:
+    from monitoring.labels import get_latest_produced_day
+
     client.post(
         "/start-shadow", json={"model_version": str(result["model_version"])}
     ).raise_for_status()
+    # current_day 는 트리거가 논리적으로 걸린 날짜일 뿐이다. 재학습이 도는
+    # 몇 분 동안 feeder(별도 프로세스)는 실시간으로 계속 앞서 나가므로,
+    # 섀도우가 서버에 실제로 반영되는 이 순간엔 feeder 가 이미 그보다 한참
+    # 앞선 날짜를 보내고 있다(실측: 트리거 Day 37인데 실제 반영 시점엔
+    # feeder 가 Day 48 근처). 그 이전 생산분은 섀도우가 켜지기 전에 이미
+    # /predict 를 통과해 버려 관찰 대상이 될 수 없으므로, 관찰 시작 기준일은
+    # 다시 조회한 "지금 실제로 생산된 최신 날짜"로 잡는다.
+    actual_start_day = get_latest_produced_day(LABELS_DB)
     state.shadow = ShadowState(
         candidate_version=str(result["model_version"]),
         run_id=result["run_id"],
         retrain_dir=str(result["retrain_dir"]),
         missed=result["missed"],
-        start_day=current_day,
+        start_day=actual_start_day,
     )
     print(
         f"  섀도우 시작 — version {result['model_version']} "
-        f"(라벨 {GATE_SAMPLE_SIZE}건 도착까지 관찰)",
+        f"(라벨 {GATE_SAMPLE_SIZE}건 도착까지 관찰, 관찰 기준일 Day {actual_start_day})",
         flush=True,
     )
 
