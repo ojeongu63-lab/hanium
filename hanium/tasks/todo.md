@@ -372,3 +372,42 @@ bak-20260819-scenarioB`)이 실제로는 8/19 순수 정본이 아니라 그 사
 검증 없이 신뢰하면 오염이 조용히 누적된다. `id > 202`인 행을 지워
 202건으로 다시 맞췄다(바이트 해시는 sqlite 내부 구조상 달라지지만
 count·내용은 8/19 정본과 동일 확인).
+
+## 섀도우 배포 (2026-08-25)
+
+멘토 요구가 아니라 사용자가 "MLOps 포트폴리오로 발전시키고 싶다"는 목적에서
+시작. 브레인스토밍 → 스펙(`02-cnc-machining/docs/specs/2026-08-25-cnc-shadow-deployment-design.md`)
+→ 계획(`02-cnc-machining/docs/plans/2026-08-25-cnc-shadow-deployment.md`)
+→ 인라인 구현 순서로 진행.
+
+**만든 것**: 게이트(G1+G2, 트리거 시점) 통과 후 즉시 100% 승격하던 걸,
+candidate를 실트래픽에 병행 투입(응답엔 영향 없음)해 라벨 20건 도착까지
+관찰한 뒤 champion vs candidate 정확도를 다시 비교해 최종 승격/폐기를
+정하는 섀도우 단계로 바꿨다. 신규: `src/monitoring/shadow_log.py`.
+수정: `src/serving/app.py`(`/start-shadow`, `/stop-shadow`, `/predict`
+병행 추론), `src/retraining/gate.py`(`evaluate_shadow`),
+`monitoring/drift_worker.py`(섀도우 상태·감시·승격), `monitoring/
+simulate_timeline.py`(`--pace-seconds` 추가).
+
+**실측 검증**: 시나리오 A(온도)를 세 번 재현하며 스펙에 없던 버그 3개를
+찾아 고쳤다(라벨 오프셋을 개수가 아니라 생산일 기준으로, feeder에 페이스
+조절 추가, 섀도우 시작 기준일을 논리적 트리거일이 아니라 실제 서버 반영
+시점으로 재조회). 최종적으로 `--days 70`, `--pace-seconds 15`로 섀도우가
+실제로 끝까지(시작→실시간 관찰→라벨 매칭→승격) 작동하는 걸 확인 —
+champion v1 → 승격 v39.
+
+**추가로 발견해 고친 것**: 승격 직후 쿨다운 없이 즉시 재트리거되는 문제
+(섀도우 기간이 쿨다운보다 훨씬 길어서) — 섀도우 종료 시에도 쿨다운을
+재설정하도록 수정.
+
+**알려진 한계로 남긴 것**: `--days`가 `TOTAL_DAYS`(40)를 넘으면 온도
+변형이 설계 상한(Day 40 기준 1.0)의 거의 2배까지 커진다. v39 승격 시
+champion이 20건 중 0건을 맞힌 게 이 때문 — 섀도우 로직의 결함이 아니라
+시뮬레이션 파라미터 문제이며, 섀도우 검증 기간을 확보하려면(`--days`를
+`TOTAL_DAYS`보다 크게 잡아야 함) 피할 수 없는 트레이드오프다. 코드는
+안 건드리고 스펙에 정정 기록만 남겼다.
+
+**뒷정리**: champion을 `promote_model.py 1` + `restore_backup()`으로 v1
+복원(threshold `0.8566220998764038`, scaler/baseline 해시 `edee2506`/
+`85c9aacf` 전부 원래와 일치 확인). `labels.db`/`requests.db`도 정본
+백업에서 복원. 전체 테스트 153개(신규 12개 포함) 통과.
