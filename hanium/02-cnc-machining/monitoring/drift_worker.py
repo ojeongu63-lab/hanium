@@ -295,6 +295,11 @@ def _check_shadow(client, state, current_day, scenario) -> str:
         print("  섀도우 거부 — champion 유지, 사람 확인 필요", flush=True)
         result_action = "shadow_rejected"
 
+    # 섀도우 기간(라벨 20건 도착까지)이 쿨다운(5일)보다 훨씬 길어질 수 있어,
+    # 여기서 다시 걸어두지 않으면 종료 직후 flag_history 가 이미 연속 3회를
+    # 채운 채로 곧바로 재트리거된다(실측으로 확인) — 원래 쿨다운의 취지
+    # ("재학습 직후 즉시 재발동 방지")를 섀도우 종료 시점에도 적용한다.
+    state.cooldown_remaining = COOLDOWN_DAYS
     state.shadow = None
     return result_action
 
