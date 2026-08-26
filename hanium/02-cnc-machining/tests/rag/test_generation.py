@@ -86,3 +86,38 @@ def test_generate_guide_includes_retrieved_chunk_text_in_user_prompt():
 
     messages = client.chat.completions.last_kwargs["messages"]
     assert "Reduce cutting speed" in messages[1]["content"]
+
+
+from rag.generation import generate_cause_guide
+
+
+def test_generate_cause_guide_parses_json_response():
+    client = _FakeClient(json.dumps(_PAYLOAD))
+
+    guide = generate_cause_guide("tool_wear", [], client)
+
+    assert guide == _PAYLOAD
+
+
+def test_generate_cause_guide_includes_confidence_principle_in_system_prompt():
+    client = _FakeClient(json.dumps(_PAYLOAD))
+
+    generate_cause_guide("tool_wear", [], client)
+
+    messages = client.chat.completions.last_kwargs["messages"]
+    assert messages[0]["role"] == "system"
+    assert "단정하지" in messages[0]["content"]
+
+
+def test_generate_cause_guide_includes_cause_and_chunk_text_in_user_prompt():
+    client = _FakeClient(json.dumps(_PAYLOAD))
+    chunks = [{
+        "title": "Sandvik", "url": "https://x", "content_type": "cause",
+        "text": "Reduce cutting speed",
+    }]
+
+    generate_cause_guide("tool_wear", chunks, client)
+
+    messages = client.chat.completions.last_kwargs["messages"]
+    assert "tool_wear" in messages[1]["content"]
+    assert "Reduce cutting speed" in messages[1]["content"]
