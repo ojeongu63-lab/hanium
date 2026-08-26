@@ -15,6 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -34,6 +35,11 @@ BATCHES_PER_DAY = 5
 DRIFT_START_DAY = 10          # Day 1~10 은 변형 없는 baseline 구간
 LABEL_DELAY_DAYS = 7
 WEAR_LABEL_FLIP_DAY = 21      # 시나리오 B에서 QC 불합격이 시작되는 날
+VIBRATION_LABEL_FLIP_DAY = 21  # WEAR_LABEL_FLIP_DAY 와 동일 — Step 6에서 필요시 조정
+VIBRATION_RATE = 0.35          # 자리값 — Step 6에서 스윕 후 확정. 0.2(WEAR_RATE 채택값과
+                                # 동일 자리)는 n=200 표본에서 분산 증가가 샘플링 노이즈에
+                                # 묻혀 test_apply_fixture_loosening_keeps_mean_but_increases_spread
+                                # 가 결정적으로 실패해 GRID의 다음 값인 0.35로 올렸다.
 
 # sweep_drift_constants.py 로 확정한 값. champion v1 (threshold 0.8566) 기준.
 # 목표 Day 40 score/threshold — temperature 1.5~2.0, tool_wear 3.0
@@ -66,6 +72,10 @@ WEAR_COLUMNS = [
     "S_OutputCurrent", "S_OutputPower", "S_CurrentFeedback",
     "X_OutputPower", "Y_OutputPower",
 ]
+VIBRATION_COLUMNS = [
+    "X_ActualPosition", "Y_ActualPosition", "Z_ActualPosition",
+    "X_ActualVelocity", "Y_ActualVelocity", "Z_ActualVelocity",
+]
 
 
 def progress_for(day: int) -> float:
@@ -96,13 +106,31 @@ def apply_tool_wear(df: pd.DataFrame, progress: float) -> pd.DataFrame:
     return out
 
 
-PERTURBATIONS = {"temperature": apply_temperature, "tool_wear": apply_tool_wear}
+def apply_fixture_loosening(df: pd.DataFrame, progress: float) -> pd.DataFrame:
+    """고정구/척 풀림: 진행될수록 위치·속도 추종의 흔들림(분산)이 커진다.
+    apply_tool_wear와 달리 평균은 그대로 두고 노이즈만 키운다."""
+    out = df.copy()
+    rng = np.random.default_rng(43)  # tool_wear 계열과 겹치지 않는 고정 시드
+    for col in VIBRATION_COLUMNS:
+        out[col] = out[col] + rng.normal(
+            0, out[col].std() * VIBRATION_RATE * progress, size=len(out)
+        )
+    return out
+
+
+PERTURBATIONS = {
+    "temperature": apply_temperature,
+    "tool_wear": apply_tool_wear,
+    "fixture_loosening": apply_fixture_loosening,
+}
 
 
 def true_label(scenario: str, day: int) -> str:
     """제품이 실제로 불량이냐. 온도는 제품 품질을 바꾸지 않는다."""
     if scenario == "temperature":
         return "good"
+    if scenario == "fixture_loosening":
+        return "bad" if day >= VIBRATION_LABEL_FLIP_DAY else "good"
     return "bad" if day >= WEAR_LABEL_FLIP_DAY else "good"
 
 
