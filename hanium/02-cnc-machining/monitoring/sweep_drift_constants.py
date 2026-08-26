@@ -57,6 +57,11 @@ def main() -> None:
         st.WEAR_RATE = v
         print(f"  v={v:<5} ratio={ratio_for(st.apply_tool_wear(base, 1.0), state):.2f}")
 
+    print("=== fixture_loosening (VIBRATION_RATE = v) ===")
+    for v in GRID:
+        st.VIBRATION_RATE = v
+        print(f"  v={v:<5} ratio={ratio_for(st.apply_fixture_loosening(base, 1.0), state):.2f}")
+
 
 if __name__ == "__main__":
     main()
