@@ -233,6 +233,28 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
 - 진행 경과와 실측 결과(시나리오 A: 승격, 시나리오 B: 5회 모두 거부)는
   [`../tasks/todo.md`](../tasks/todo.md)에 기록돼 있다.
 
+### 2-8. Docker로 실행
+
+로컬에 `uv`를 안 깔고도, 다른 컴퓨터에서 동일하게 서빙 앱을 띄울 수 있다.
+이미지 안에는 코드·의존성만 담고, `data/`(모델·MLflow 기록)는 볼륨으로
+연결한다 — 그래야 이미지가 커지지 않고, 재학습·승격으로 `data/`가 바뀌어도
+이미지를 다시 빌드할 필요가 없다.
+
+```bash
+cd 02-cnc-machining
+docker build -t cnc-serving .
+docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
+```
+
+- 접속: `http://127.0.0.1:8000/docs`
+- `data/`가 없으면(§1-2 데이터 배치를 안 했으면) champion을 못 찾아 컨테이너가
+  뜨자마자 503을 낸다 — 로컬에서 먼저 데이터를 배치한 뒤 실행할 것.
+- RAG(`guide` 필드)를 쓰려면 `--env-file .env`를 추가로 넘긴다. 없어도
+  서버는 정상 기동되고 `guide`만 `null`로 나온다(§1-4와 동일).
+- 이미지에는 `data/`, `.venv/`, `.git/` 등을 안 담는다(`.dockerignore`
+  참고) — 안 그러면 로컬 데이터(수 GB)까지 빌드 컨텍스트로 잡혀 몇 분씩
+  걸린다.
+
 ## 3. WSL에서 Windows 브라우저로 접속이 안 될 때
 
 - 기본은 `http://localhost:<port>` 또는 `http://127.0.0.1:<port>`로 바로 열림
@@ -287,6 +309,7 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
 |---|---|
 | `docs/specs/`, `docs/plans/` | 설계 스펙 / 구현 계획 문서 |
 | `data/` | 원본·전처리·모델·MLflow 기록 (git 제외, §1-2 참고) |
+| `Dockerfile`, `.dockerignore` | 서빙 앱 컨테이너화 (§2-8) |
 
 > 각 스크립트는 자기 파일 위치로 프로젝트 루트를 역산한다
 > (`Path(__file__).parent.parent`). **폴더 깊이가 코드에 박혀 있으므로**
