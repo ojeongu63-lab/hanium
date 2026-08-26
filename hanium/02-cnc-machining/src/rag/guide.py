@@ -1,4 +1,4 @@
-from .generation import generate_guide
+from .generation import generate_cause_guide, generate_guide
 from .query import build_query
 from .retrieval import embed_text, search
 
@@ -31,4 +31,16 @@ def build_guide(
         return generate_guide(predict_result, chunks, openai_client)
     except Exception as exc:
         print(f"RAG 가이드 생성 실패: {exc}")
+        return None
+
+
+def build_cause_guide(cause: str, rag_corpus: list[dict] | None, openai_client) -> dict | None:
+    if rag_corpus is None or openai_client is None:
+        return None
+    try:
+        chunks = [c for c in rag_corpus if c["fault_category"] == cause]
+        chunks += [c for c in rag_corpus if c["content_type"] == "safety"]
+        return generate_cause_guide(cause, chunks, openai_client)
+    except Exception as exc:
+        print(f"원인 설명 생성 실패: {exc}")
         return None
