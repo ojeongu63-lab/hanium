@@ -6,4 +6,4 @@ def test_describe_feature_known():
 
 
 def test_describe_feature_unknown_falls_back_to_code():
-    assert describe_feature("Z_SetVelocity") == "Z_SetVelocity"
+    assert describe_feature("UNKNOWN_SENSOR") == "UNKNOWN_SENSOR"

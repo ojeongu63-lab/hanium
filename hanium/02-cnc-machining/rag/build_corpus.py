@@ -24,6 +24,15 @@ OSHA_META = {
     "title": "OSHA Machine Guarding & Lockout/Tagout",
     "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements",
 }
+KAMP_SECTION_META = {
+    "CNC 공구 마모와 가공 정밀도": {"fault_category": "tool_wear", "content_type": "context"},
+    "간접 센서 신호를 통한 공구수명 추정": {"fault_category": "tool_wear", "content_type": "cause"},
+    "양품/불량 판정 기준": {"fault_category": "general", "content_type": "context"},
+}
+KAMP_META = {
+    "title": "KAMP CNC 머신 AI 데이터셋 가이드북",
+    "url": "https://www.kamp-ai.kr/",
+}
 
 
 def parse_sandvik(text: str) -> list[dict]:
@@ -95,15 +104,55 @@ def parse_osha(text: str) -> list[dict]:
     return chunks
 
 
+def parse_kamp_guide(text: str) -> list[dict]:
+    chunks = []
+    section_meta = None
+    heading = None
+    body_lines: list[str] = []
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if heading and body_lines:
+                chunks.append({
+                    "heading": heading,
+                    "text": "\n".join(body_lines).strip(),
+                    **section_meta,
+                })
+            heading, body_lines = None, []
+            section_meta = KAMP_SECTION_META.get(line[3:].strip())
+        elif line.startswith("### "):
+            if heading and body_lines:
+                chunks.append({
+                    "heading": heading,
+                    "text": "\n".join(body_lines).strip(),
+                    **section_meta,
+                })
+            heading = line[4:].strip()
+            body_lines = []
+        elif heading is not None and line.strip():
+            body_lines.append(line.strip())
+
+    if heading and body_lines:
+        chunks.append({
+            "heading": heading,
+            "text": "\n".join(body_lines).strip(),
+            **section_meta,
+        })
+    return chunks
+
+
 def build_corpus() -> list[dict]:
     sandvik_text = (SOURCES_DIR / "sandvik_milling_troubleshooting.md").read_text()
     osha_text = (SOURCES_DIR / "osha_machine_guarding_lockout.md").read_text()
+    kamp_text = (SOURCES_DIR / "kamp_cnc_dataset_guide.md").read_text()
 
     corpus = []
     for chunk in parse_sandvik(sandvik_text):
         corpus.append({**chunk, **SANDVIK_META})
     for chunk in parse_osha(osha_text):
         corpus.append({**chunk, **OSHA_META})
+    for chunk in parse_kamp_guide(kamp_text):
+        corpus.append({**chunk, **KAMP_META})
     return corpus
 
 
