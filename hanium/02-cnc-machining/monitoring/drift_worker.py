@@ -25,6 +25,8 @@ from retraining.gate import evaluate_gate, evaluate_shadow  # noqa: E402
 from retraining.promotion import swap_with_rollback, verify_serving_contract  # noqa: E402
 from retraining.runner import run_retraining  # noqa: E402
 from retraining.trigger import days_to_process, is_drift_flagged, should_retrain  # noqa: E402
+from monitoring.cause_estimation import estimate_cause  # noqa: E402
+from rag.guide import build_cause_guide  # noqa: E402
 
 LABELS_DB = ROOT / "data" / "monitoring" / "labels.db"
 REQUESTS_DB = ROOT / "data" / "monitoring" / "requests.db"
@@ -71,6 +73,8 @@ class WorkerState:
     champion_missed: int = 1                # 현 champion 실측 — 불량 11개 중 1개 놓침
     champion_accuracy: float = 0.0          # 첫 게이트 평가 시 측정값으로 대체
     shadow: ShadowState | None = None
+    rag_corpus: list[dict] | None = None
+    openai_client: object | None = None
 
 
 def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
@@ -114,7 +118,7 @@ def _decide_and_start_shadow(client, state, result, current_day, scenario) -> st
         print(f"  거부 — 서빙 계약 미충족: {missing}", flush=True)
         return "rejected"
 
-    champion_accuracy, retrained_accuracy, sample_size = _gate_accuracies(
+    champion_accuracy, retrained_accuracy, sample_size, champion_contributions = _gate_accuracies(
         result, current_day, scenario
     )
     verdict = evaluate_gate(
@@ -123,11 +127,12 @@ def _decide_and_start_shadow(client, state, result, current_day, scenario) -> st
         retrained_accuracy=retrained_accuracy,
         champion_accuracy=champion_accuracy,
     )
-    _tag(mlflow_client, result["run_id"], scenario, current_day,
-         decision=verdict["decision"], reason=verdict["reject_reason"],
-         extra={"gate_g1_missed": verdict["g1_missed"],
-                "gate_g2_accuracy_delta": verdict["g2_accuracy_delta"],
-                "gate_g2_sample_size": sample_size})
+
+    extra_tags = {
+        "gate_g1_missed": verdict["g1_missed"],
+        "gate_g2_accuracy_delta": verdict["g2_accuracy_delta"],
+        "gate_g2_sample_size": sample_size,
+    }
 
     print(f"  게이트: G1 놓침={verdict['g1_missed']}건 (champion {state.champion_missed}건, "
           f"허용 {state.champion_missed + 1}건) / "
@@ -135,9 +140,24 @@ def _decide_and_start_shadow(client, state, result, current_day, scenario) -> st
           f"(표본 {sample_size}건)", flush=True)
 
     if verdict["decision"] == "rejected":
+        cause = estimate_cause(champion_contributions)
+        guide = build_cause_guide(cause, state.rag_corpus, state.openai_client)
+        extra_tags["estimated_cause"] = cause
+        extra_tags["recommended_action"] = (
+            "; ".join(guide["recommended_actions"]) if guide else ""
+        )
+        _tag(mlflow_client, result["run_id"], scenario, current_day,
+             decision="rejected", reason=verdict["reject_reason"], extra=extra_tags)
+        action_desc = (
+            guide["recommended_actions"] if guide
+            else "(RAG 비활성 — OPENAI_API_KEY 또는 코퍼스 없음)"
+        )
         print(f"  거부 — {verdict['reject_reason']}  (champion 유지, 사람 확인 필요)", flush=True)
+        print(f"  추정 원인: {cause} / 권장 조치: {action_desc}", flush=True)
         return "rejected"
 
+    _tag(mlflow_client, result["run_id"], scenario, current_day,
+         decision=verdict["decision"], reason="", extra=extra_tags)
     _start_shadow(client, state, result, current_day)
     return "shadow_started"
 
@@ -178,18 +198,19 @@ def _predict_labels(batch_paths, model, scaler_dict, threshold, baseline, window
     from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
     from serving.inference import predict_experiment
 
-    labels = []
+    results = []
     for path in batch_paths:
         result = predict_experiment(
             pd.read_csv(path), model, FEATURE_COLUMNS, scaler_dict, window_size,
             threshold, "mean", baseline, SETUP_CONSTANT_COLUMNS,
         )
-        labels.append(result["predicted_label_text"])
-    return labels
+        results.append(result)
+    return results
 
 
-def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[float, float, int]:
-    """G2 입력 — 라벨 도착 구간에서 champion과 재학습 모델의 정확도.
+def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[float, float, int, list[list[dict]]]:
+    """G2 입력 — 라벨 도착 구간에서 champion과 재학습 모델의 정확도, 그리고
+    champion의 배치별 feature_contributions(원인 추정용).
 
     두 모델을 같은 배치에 대고 직접 돌려 비교한다. champion 판정을 predict_log
     에서 꺼내오지 않는 이유는 배치 식별자가 로그에 없어 짝을 맞출 수 없기
@@ -208,17 +229,19 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
 
     arrived = get_arrived_labels(current_day, LABELS_DB)[-GATE_SAMPLE_SIZE:]
     if not arrived:
-        return 0.0, 0.0, 0
+        return 0.0, 0.0, 0, []
 
     timeline_dir = ROOT / "data" / "timeline" / scenario
     batch_paths = [timeline_dir / f"{r['batch_id']}.csv" for r in arrived]
     truths = [r["label"] for r in arrived]
 
     champion = load_model_state()
-    champion_preds = _predict_labels(
+    champion_results = _predict_labels(
         batch_paths, champion.model, champion.scaler_dict,
         champion.thresholds["mean"], champion.feature_baseline, champion.window_size,
     )
+    champion_preds = [r["predicted_label_text"] for r in champion_results]
+    champion_contributions = [r["feature_contributions"] for r in champion_results]
 
     retrain_dir = Path(result["retrain_dir"])
     model = LSTMAutoencoder(
@@ -228,7 +251,7 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
     )
     model.load_state_dict(torch.load(retrain_dir / "model.pt"))
     model.eval()
-    retrained_preds = _predict_labels(
+    retrained_results = _predict_labels(
         batch_paths,
         model,
         json.loads((retrain_dir / "scaler.json").read_text()),
@@ -236,11 +259,13 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
         json.loads((retrain_dir / "feature_baseline.json").read_text()),
         TRAINING_CONFIG["window_size"],
     )
+    retrained_preds = [r["predicted_label_text"] for r in retrained_results]
 
     return (
         accuracy_from_pairs(truths, champion_preds),
         accuracy_from_pairs(truths, retrained_preds),
         len(truths),
+        champion_contributions,
     )
 
 
@@ -351,15 +376,17 @@ def main() -> None:
     import httpx2
 
     from monitoring.labels import get_latest_produced_day
+    from serving.app import load_rag_state
 
     parser = argparse.ArgumentParser(description="드리프트 감시 워커 (독립 프로세스)")
     # simulate_timeline.py 의 PERTURBATIONS 키와 동일 — feeder 가 생성하는 시나리오.
-    parser.add_argument("scenario", choices=["temperature", "tool_wear"])
+    parser.add_argument("scenario", choices=["temperature", "tool_wear", "fixture_loosening"])
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--poll-interval", type=float, default=5.0, help="폴링 주기(초)")
     args = parser.parse_args()
 
     state = WorkerState()
+    state.rag_corpus, _, state.openai_client = load_rag_state()
     last_day = 0
 
     with httpx2.Client(base_url=args.base_url, timeout=30.0) as client:
