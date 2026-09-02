@@ -5,6 +5,10 @@
 `2026-08-26-cnc-cause-estimation-design.md`(거부 원인 추정 — 이 문서의
 "실행 결과에 따른 정정" 절이 본 스펙의 출발점).
 
+**상태 (2026-09-02)**: Part A·B(두 방향 게이트)는 구현 범위. Part C(홀드아웃
+임계값 보정)는 구현 전 데이터 확인에서 이 데이터셋에 맞지 않는 것으로
+드러나 **보류** — 맨 아래 "구현 전 데이터 확인" 절 참고.
+
 ## 배경
 
 ### 실측으로 드러난 사각지대
@@ -55,14 +59,17 @@ Day 34의 창(생산일 24~27)은 불량 시작(Day 21)과 라벨 지연(7일) �
 - 게이트가 더 중요하다. 어느 방향으로 튀어도 걸러내는 쪽이 안전의
   본체이고, 임계값 보정은 후보의 품질을 올리는 보조다.
 
+(2026-09-02 데이터 확인 후 결정: 보조인 임계값 보정은 이 데이터셋에서
+반대쪽으로 지나쳐 보류. 게이트만으로 안전은 확보된다 — 맨 아래 절.)
+
 ## 목표 / 비목표
 
 **목표**
 
 1. G2(그리고 섀도우 판정)가 오탐과 놓침을 **따로** 세어, 한쪽을 다른
    쪽과 맞바꾸는 후보와 한쪽을 아예 잴 수 없는 창을 통과시키지 않는다.
-2. 재학습 후보의 임계값과 feature_baseline을 학습에 쓰지 않은 정상
-   배치(홀드아웃)의 오차로 정한다.
+2. ~~재학습 후보의 임계값과 feature_baseline을 학습에 쓰지 않은 정상
+   배치(홀드아웃)의 오차로 정한다.~~ → **보류** (데이터 확인 결과, 맨 아래 절).
 3. `temperature` 시나리오의 기존 동작(정상 라벨뿐인 창에서 오탐 개선으로
    승격)은 유지한다.
 
@@ -202,7 +209,11 @@ verdict = evaluate_gate(result["missed"], state.champion_missed, g2)
 `gate_g2_sample_size`, `gate_g1_missed`, `gate_decision`, `gate_reject_reason`,
 `estimated_cause`, `recommended_action`, `scenario`, `trigger_day`는 그대로.
 
-## Part C — 재학습 임계값 홀드아웃 보정
+## Part C — 재학습 임계값 홀드아웃 보정 (보류)
+
+**이번 구현 범위에서 제외한다.** 아래 설계는 참고용으로 남긴다. 보류 근거는
+"구현 전 데이터 확인" 절 — 요약하면, 보정 집합의 p95가 feedrate=20 실험(2)
+유래 배치 위에 떨어져 후보가 champion보다 둔해진다.
 
 ### `src/retraining/runner.py`
 
@@ -308,7 +319,7 @@ champion은 실험 8개로 학습됐다. 여기서 보정용을 떼면 학습이
   고정해 유지. G1·G2 동시 위반 시 사유 두 줄 연결.
 - `accuracy_from_pairs`·`evaluate_shadow` 테스트 5개 삭제.
 
-`tests/retraining/test_runner.py`
+`tests/retraining/test_runner.py` (Part C — 보류, 구현 시 제외)
 
 - `split_calibration`: 하루 5배치면 그날 첫 배치만 보정, 하루 10배치면
   2개, 보정·학습이 겹치지 않고 합집합이 원본.
@@ -316,7 +327,7 @@ champion은 실험 8개로 학습됐다. 여기서 보정용을 떼면 학습이
 - scaler가 train_raw로만 fit되는지(calibration 평균이 0이 아님).
 - 기존 4개 테스트는 반환이 튜플이 된 것만 반영.
 
-`tests/lstm_ae/test_pipeline.py`
+`tests/lstm_ae/test_pipeline.py` (Part C — 보류, 구현 시 제외)
 
 - `calibration_csv_path` 있음: `thresholds`가 보정 배치 점수의 p95와
   일치, `feature_baseline`이 보정 배치 기준, `training_config.json`에
@@ -337,15 +348,9 @@ DB 초기화(`labels.db`, `requests.db`, `shadow.db`) 후 세 프로세스로 �
 | tool_wear | 40일, `--pace-seconds 2` | 5회 거부, `estimated_cause=tool_wear` 5/5 |
 | temperature | 70일, `--pace-seconds 15` | 거부 몇 회 뒤 **게이트 통과 → 섀도우 → 승격**(8/25와 같은 흐름). 정상 라벨뿐인 창에서 오탐 감소로 통과해야 한다 |
 
-추가로 볼 것:
-
-- 재학습 후보의 임계값이 champion 대비 어느 쪽으로 움직였는지
-  (`retrain_dir/evaluation_report.json`). 09-02 기준값: v44 0.62 vs
-  champion 0.86.
-- `temperature`에서 홀드아웃 보정이 승격 시점을 앞당기거나 늦추는지.
-  늦춰진다면 원인을 정정 절에 적는다.
-
-결과는 이 문서에 "실행 결과에 따른 정정" 절로 기록한다.
+게이트만 바뀌므로 세 시나리오의 판정은 "구현 전 데이터 확인" 절의 사후
+적용 표와 같아야 한다(같지 않다면 구현 오류다). 결과는 이 문서에 "실행
+결과에 따른 정정" 절로 기록한다.
 
 ## 알려진 한계 (미리 적어 두는 것)
 
@@ -355,10 +360,10 @@ DB 초기화(`labels.db`, `requests.db`, `shadow.db`) 후 세 프로세스로 �
   표에서 champion이 놓친 8건은 전부 실험 11·13·14·17 유래). 건수 눈금이
   작은 표본에서 우연에 흔들릴 수 있으나, 표본을 늘리면 측정 대상이
   바뀐다는 8/19 결론대로 창은 손대지 않는다.
-- 보정 배치를 떼면 학습 데이터가 약 20% 줄어든다. 시뮬레이션에서는 같은
-  8개 패턴의 복사본이라 영향이 작지만 실제 운영에서는 다를 수 있다.
-- champion과 재학습 모델의 임계값 산출 방식이 다르다(학습 오차 vs
-  홀드아웃 오차).
+- 재학습 후보의 임계값은 여전히 학습 오차 기준이라 데이터가 늘수록 과민
+  쪽으로 밀린다(Part C 보류의 대가). 과민한 후보는 G2 오탐 회귀로 거부되지만,
+  `temperature` 유형에서 승격되는 후보도 "champion보다 오탐이 적다"일 뿐
+  절대 오탐률은 높을 수 있다(스파이크: Day 37 후보 오탐 11/20 vs champion 18/20).
 - 정상 라벨만 있는 창에서 놓침 쪽을 G1에 맡기는데, G1은 실측에서 한 번도
   작동한 적이 없다(8/19). 이 경로의 안전성은 지금과 같고 더 나아지지는
   않는다.
@@ -369,11 +374,75 @@ DB 초기화(`labels.db`, `requests.db`, `shadow.db`) 후 세 프로세스로 �
 |---|---|
 | `src/retraining/gate.py` | `evaluate_two_sided` 신규. `evaluate_gate` 시그니처 변경(`g2` 딕셔너리). `evaluate_shadow`·`accuracy_from_pairs` 제거 |
 | `monitoring/drift_worker.py` | `_gate_accuracies` → `_gate_predictions`. 게이트·섀도우 판정을 `evaluate_two_sided`로. 로그·태그 변경 |
-| `src/retraining/runner.py` | `split_calibration` 신규. `collect_normal_batches`가 (train, calibration) 반환. scaler는 train만. `calibration.csv` 저장, params 2개 추가, `NOT_INSTALLED`에 추가 |
-| `src/lstm_ae/pipeline.py` | `calibration_csv_path` 인자. 있으면 임계값·feature_baseline을 보정 배치(stride 1)로 계산. `training_config.json`에 `calibration_batches` |
-| `tests/retraining/test_gate.py`, `test_runner.py`, `tests/lstm_ae/test_pipeline.py`, 워커 테스트 | 위 변경 반영 |
+| ~~`src/retraining/runner.py`~~ | (보류) `split_calibration`, (train, calibration) 반환, `calibration.csv` |
+| ~~`src/lstm_ae/pipeline.py`~~ | (보류) `calibration_csv_path` 인자 |
+| `tests/retraining/test_gate.py`, 워커 테스트 | 위 변경 반영 |
 | `docs/STRUCTURE.md`, `README.md` | gate.py 설명(오탐·놓침 두 방향), 태그 이름 갱신 |
 
 변경하지 않는 것: `scripts/run_lstm_training.py`, `src/serving/*`,
 `src/retraining/promotion.py`, `src/retraining/trigger.py`,
+`src/retraining/runner.py`, `src/lstm_ae/pipeline.py`,
 `monitoring/simulate_timeline.py`, `GATE_SAMPLE_SIZE`.
+
+## 구현 전 데이터 확인 (2026-09-02)
+
+사용자 요청("데이터가 있으니 우리 데이터에 맞는지 먼저 보자")으로, 코드를
+바꾸기 전에 버릴 스크립트로 두 가지를 확인했다.
+
+### 확인 1 — 오늘 후보 9개(v41~v49)에 두 방향 규칙 사후 적용
+
+보관해 둔 라벨·배치(`data/monitoring/_fixture_loosening_20260902/`,
+`_tool_wear_20260902/`, `data/retrain/20260902_*`)로 각 트리거의 G2 창을
+다시 만들어 champion v1과 후보를 판정시켰다. 재현한 정확도가 워커 로그와
+전부 일치해 후보 매핑은 정확하다.
+
+| 시나리오 | 트리거 | 창 구성 | 후보 vs champion | 기존 규칙 | 새 규칙 |
+|---|---|---|---|---|---|
+| fixture | Day 19 | 정상 20 | 오탐 4 vs 2 | 거부 | 거부, 오탐 회귀 |
+| fixture | Day 24 | 정상 20 | 오탐 11 vs 3 | 거부 | 거부, 오탐 회귀 |
+| fixture | Day 29 | 정상 10 · 불량 10 | 오탐 5 vs 3, 놓침 3 vs 4 | 거부 | 거부, 오탐 회귀 |
+| fixture | Day 34 | 불량 20 | 놓침 4 vs 8 | **통과** | **거부, 정상 라벨 없음** |
+| tool_wear | Day 20 | 정상 20 | 오탐 5 vs 2 | 거부 | 거부, 오탐 회귀 |
+| tool_wear | Day 25 | 정상 20 | 오탐 7 vs 4 | 거부 | 거부, 오탐 회귀 |
+| tool_wear | Day 30 | 정상 5 · 불량 15 | 오탐 1 vs 2, 놓침 9 vs 7 | 거부 | 거부, 놓침 회귀 |
+| tool_wear | Day 35 | 불량 20 | 놓침 13 vs 0 | 거부 | 거부, 정상 라벨 없음 |
+| tool_wear | Day 40 | 불량 20 | 놓침 12 vs 0 | 거부 | 거부, 정상 라벨 없음 |
+
+- 기존 규칙과 갈리는 것은 문제였던 fixture Day 34 하나뿐이다.
+- 맞바꾸기가 실제로 양방향으로 존재한다(fixture Day 29: 오탐↑ 놓침↓,
+  tool_wear Day 30: 오탐↓ 놓침↑). 클래스별 회귀 금지가 둘 다 잡는다.
+- `temperature`는 창이 정상뿐이라 새 규칙이 정확도 규칙과 수학적으로
+  같다. Day 37 후보를 재생성한 배치로 판정하면 오탐 11 vs 18 → 통과
+  (08-19 실측 0.45 vs 0.10과 일치).
+
+### 확인 2 — 홀드아웃 임계값 보정 시제품 (실제 재학습 3회)
+
+Part C 설계대로 정상 배치를 생산일별 1/5로 나눠 세 지점에서 재학습하고,
+보정 배치(stride 1)의 p95로 임계값을 다시 정해 같은 창을 판정시켰다.
+
+| 지점 | 임계값 학습오차 → 보정 | 정상 창 오탐: 후보 보정 전 → 후 (champion) | 불량 창 놓침: 보정 전 → 후 (champion) | 원본 eval G1 놓침: 보정 전 → 후 (champion 1) |
+|---|---|---|---|---|
+| fixture Day 24 | 0.576 → 1.052 | 10 → 3 (3) | — | 0 → 2 |
+| fixture Day 34 | 0.630 → 1.065 | 6 → 3 (3) | 6 → 14 (8) | 0 → 2 |
+| temperature Day 37 | 0.562 → 1.077 | 11 → 3 (18) · 섀도우 창 10 → 2 (20) | — | 0 → 2 |
+
+- **의도한 효과는 난다.** 과민이 사라져 정상 창 오탐이 세 지점 모두
+  champion 수준이 되고, `temperature`의 승격 근거가 훨씬 확실해진다.
+- **그러나 반대쪽으로 지나친다.** 보정 임계값 1.05~1.08은 세 경우 모두
+  **feedrate=20 실험(2) 유래 배치**가 만든 값이다(보정 배치 점수 상위가
+  전부 실험 2, 1.05~1.09; 그다음은 0.7~0.8). 실험 2는 정상이어도 늘 높게
+  나오는 알려진 한계 데이터인데 전체의 12.5%라, 보정 집합 크기와 무관하게
+  p95가 이 배치 위에 떨어진다. 결과로 후보가 champion보다 둔해진다 —
+  원본 eval 놓침 0 → 2(G1 허용치 champion+1에 딱 걸림, 놓친 것은 실험
+  6·21), fixture 불량 창 놓침 6 → 14(champion 8).
+- champion의 임계값 0.857도 실험 2(0.97)가 끌어올린 값이다. 8개 값의
+  p95 보간이 우연히 중간에 떨어졌을 뿐, 같은 구조다.
+
+### 결정
+
+- **Part A·B 구현.** 두 방향 게이트만으로 과민한 후보는 오탐 회귀로,
+  전부 불량인 창은 정상 라벨 없음으로 걸러진다. `temperature` 승격은
+  지금처럼 된다.
+- **Part C 보류.** 이 데이터셋에서는 보정이 후보를 둔하게 만들고, p95를
+  피해 가는 다른 통계량을 고르는 것은 결과가 나올 때까지 손잡이를 돌리는
+  일이라 하지 않는다. feedrate=20 조건의 정상 표본이 더 확보되면 다시 본다.
