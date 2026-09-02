@@ -92,6 +92,8 @@ nice -n 19 uv run uvicorn serving.app:app --port 8899
   + `guide`: 불량 판정일 때 RAG(코퍼스 검색 + OpenAI 생성)로 만든 현장 조치
   가이드(원인 추정/확신도 설명/권장 조치/안전수칙/출처). 정상 판정이면 고정
   메시지, 코퍼스 미구축이거나 `OPENAI_API_KEY` 없으면 `null`(아래 2-4 참고)
+- `/drift-status`, `/reload-model`, `/start-shadow`, `/stop-shadow`: 자동 재학습
+  루프용(§2-7). 감시 워커가 호출하며 사람이 직접 쓸 일은 거의 없음
 
 테스트용 실험 CSV 경로 (경로에 공백 있으니 항상 따옴표):
 
@@ -141,8 +143,9 @@ uv run python scripts/promote_model.py <등록된 버전 번호>  # 그 버전�
 ### 2-4. RAG 코퍼스 구축 (최초 1회, OpenAI API 키 필요)
 
 `/predict`의 `guide` 필드가 검색할 지식 코퍼스를 만드는 스크립트. 실제 공개
-문서(Sandvik Coromant 밀링 트러블슈팅, OSHA 기계 안전수칙 — 원문은
-`rag/sources/*.md`에 이미 로컬로 저장돼 있어 웹 접근 불필요)를 청크로 쪼개
+문서(Sandvik Coromant 밀링 트러블슈팅, OSHA 기계 안전수칙, KAMP 데이터셋
+가이드북 발췌 — 한국어로 번역·정리한 원문이 `rag/sources/*.md`에 이미 로컬로
+저장돼 있어 웹 접근 불필요)를 청크로 쪼개
 OpenAI 임베딩으로 변환하고 FAISS 인덱스로 저장함:
 
 ```bash
@@ -192,10 +195,17 @@ curl -s -X POST "http://127.0.0.1:8899/predict" -F "file=@synthetic/scenarios/to
 실제로 데이터가 들어오고 결과가 나가는 환경에서 시간이 지나며 입력 분포가
 서서히 틀어질 때(계절·온도 변화, 설비 마모 등) 드리프트를 감지해 자동으로
 재학습하고, 안전할 때만 승격하는 루프. 구조는 "트리거 → 재학습"이 아니라
-**"트리거 → 재학습 → 게이트 → 승격 또는 거부"** — 같은 드리프트 신호가 정반대
-원인(설비가 실제로 망가짐)에서도 나오므로, 원본 eval 성능 유지(G1)와 라벨
-도착 구간 정확도 개선(G2)을 둘 다 확인한 뒤에만 승격한다. 설계 전체는
-[`docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md`](docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md) 참고.
+**"트리거 → 재학습 → 게이트 → 섀도우 → 승격 또는 거부"** — 같은 드리프트 신호가
+정반대 원인(설비가 실제로 망가짐)에서도 나오므로, 원본 eval 성능 유지(G1)와 라벨
+도착 구간 정확도 개선(G2)을 둘 다 확인한 뒤에도 바로 승격하지 않고, 후보를 실제
+트래픽에 병행 투입(섀도우 — 응답에는 영향 없음)해 이후 생산분 라벨 20건으로 한 번
+더 비교한 뒤에만 승격한다. 게이트가 거부하면 champion의 최근 기여도로 원인을
+`tool_wear` / `vibration_backlash` 중 하나로 추정하고, 그 카테고리의 코퍼스로 RAG
+조치 제안을 만들어 MLflow run 태그(`estimated_cause`, `recommended_action`)에
+남긴다. 설계는
+[`docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md`](docs/specs/2026-08-19-cnc-drift-triggered-retraining-design.md),
+[`2026-08-25-cnc-shadow-deployment-design.md`](docs/specs/2026-08-25-cnc-shadow-deployment-design.md),
+[`2026-08-26-cnc-cause-estimation-design.md`](docs/specs/2026-08-26-cnc-cause-estimation-design.md) 참고.
 
 보유 데이터(25개 실험)에는 시간축이 없어서, 가상 운영 타임라인을 합성해
 시연한다. 서빙과 감시를 프로세스로 분리해서 돌린다 — 한 프로세스에 섞으면
@@ -208,15 +218,24 @@ nice -n 19 uv run uvicorn src.serving.app:app --app-dir . --port 8000
 
 # 터미널 2 — 감시 워커 (실제 서버를 폴링, 드리프트 잡히면 재학습·게이트·승격까지)
 cd 02-cnc-machining
-nice -n 19 uv run python monitoring/drift_worker.py temperature --base-url http://127.0.0.1:8000 --poll-interval 5
+nice -n 19 uv run --env-file .env python monitoring/drift_worker.py temperature --base-url http://127.0.0.1:8000 --poll-interval 5
 
 # 터미널 3 — feeder (가상 운영 배치를 실제 서버에 흘려보냄)
 cd 02-cnc-machining
-nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 --serve-url http://127.0.0.1:8000
+nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 --serve-url http://127.0.0.1:8000 --pace-seconds 15
 ```
 
 - 시나리오는 `temperature`(온도·계절 — 제품은 정상, 재학습이 정답) /
-  `tool_wear`(공구마모 — 실제로 불량, 게이트가 막아야 함) 둘 중 선택.
+  `tool_wear`(공구마모 — 스핀들 부하가 커지며 실제로 불량, 게이트가 막아야 함) /
+  `fixture_loosening`(고정구 풀림 — 위치·속도 추종의 흔들림이 커지며 실제로
+  불량, 게이트가 막아야 함) 셋 중 선택.
+- 워커의 `--env-file .env`는 거부 시 RAG 조치 제안용(§1-4). 없어도 워커는 돌고
+  `추정 원인`까지만 찍힌다.
+- `--pace-seconds`는 하루치 배치를 보낸 뒤 쉬는 시간. 0이면 feeder가 몇 분 만에
+  40일을 다 쏴버려, 워커가 재학습하는 사이 섀도우가 관찰할 미래 트래픽이 남지
+  않는다. 섀도우 승격까지 보려면 15 정도로 두고 `--days`도 40보다 크게(예: 70)
+  잡을 것 — 단 40일을 넘기면 변형 폭이 설계 상한을 넘어간다(섀도우 스펙의
+  정정 절 참고).
 - Day 1~9는 변형이 없는 baseline 구간이라 트리거가 걸리지 않는다(정상
   동작). 트리거는 Day 10 이후 연속 3회 flagged부터, 실제로는 Day 17~부터
   관측됨.
@@ -224,14 +243,16 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
   실행했던 직후라면 반드시 먼저 비울 것 — 안 비우면 감시 워커가 이전
   실행의 최신 날짜를 그대로 이어받아 엉뚱하게 동작한다:
   ```bash
-  rm -f data/monitoring/labels.db data/monitoring/requests.db
+  rm -f data/monitoring/labels.db data/monitoring/requests.db data/monitoring/shadow.db
   rm -rf data/timeline/<이전에 돌렸던 시나리오>
   ```
 - `--serve-url` 없이 `simulate_timeline.py`만 단독 실행하면(터미널 2·3
   불필요) 기존처럼 한 프로세스 안에서 `TestClient`로 배치 주입과 감시를
   함께 한다 — 실측 시나리오 A/B 재현에 쓴 방식이 이것이다.
-- 진행 경과와 실측 결과(시나리오 A: 승격, 시나리오 B: 5회 모두 거부)는
-  [`../tasks/todo.md`](../tasks/todo.md)에 기록돼 있다.
+- 진행 경과와 실측 결과(시나리오 A: 승격, 시나리오 B: 5회 모두 거부,
+  fixture_loosening: 거부 3회 뒤 4번째가 게이트 통과 — 원인 추정은 두
+  시나리오 합쳐 8/8 정답)는 [`../tasks/todo.md`](../tasks/todo.md)와 각
+  스펙의 "실행 결과에 따른 정정" 절에 기록돼 있다.
 
 ### 2-8. Docker로 실행
 
@@ -285,8 +306,8 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 | `src/lstm_ae/` | LSTM-Autoencoder 모델·학습·채점, `tracking.py`(MLflow 설정) |
 | `src/serving/` | 추론 로직(`inference.py`) + FastAPI 앱(`app.py`) |
 | `src/rag/` | RAG 검색(`retrieval.py`) + 생성(`generation.py`) + 오케스트레이션(`guide.py`) |
-| `src/monitoring/` | 드리프트 계산(`drift.py`), 요청 로깅, MLflow 지표 기록, QC 라벨 지연 도착(`labels.py`) |
-| `src/retraining/` | 재학습 트리거(`trigger.py`), 데이터 구성·실행(`runner.py`), 승격 게이트(`gate.py`), 안전한 파일 교체(`promotion.py`) — §2-7 |
+| `src/monitoring/` | 드리프트 계산(`drift.py`), 요청 로깅, MLflow 지표 기록, QC 라벨 지연 도착(`labels.py`), 섀도우 판정 기록(`shadow_log.py`), 거부 원인 추정(`cause_estimation.py`) |
+| `src/retraining/` | 재학습 트리거(`trigger.py`), 데이터 구성·실행(`runner.py`), 승격 게이트·섀도우 판정(`gate.py`), 안전한 파일 교체(`promotion.py`) — §2-7 |
 
 ### 실행 스크립트 + 결과물
 

@@ -8,8 +8,8 @@ CNC 가공 이상탐지 파이프라인(`02-cnc-machining/`)의 폴더·파일 �
 ## 1. 현재 상태
 
 **구현 완료** — 전처리 · 학습/평가 · MLflow 실험추적 · champion 승격 · FastAPI
-서빙 · RAG 조치 가이드 · 드리프트 모니터링까지 파이프라인 전 구간이 동작합니다.
-단위 테스트 100개 통과.
+서빙 · RAG 조치 가이드 · 드리프트 모니터링 · 트리거 재학습 · 승격 게이트 · 섀도우
+배포 · 거부 원인 추정까지 파이프라인 전 구간이 동작합니다. 단위 테스트 165개 통과.
 
 **성능** — 고정 분할(eval: 정상 3 + 불량 11개 실험) 기준 **precision 0.91 /
 recall 0.91**. 이 결과가 분할 운에 기댄 것인지 확인하기 위해 정상 실험 11개로
@@ -63,6 +63,10 @@ RAG를 얹은 것이 이 파이프라인입니다.
       │              CSV 업로드 → 판정 + 피처별 기여도
       ├─────────────  src/rag/            불량 판정 시 현장 조치 가이드 생성
       └─────────────  src/monitoring/     요청 로깅 + 입력/출력 드리프트 감지
+                                          ↓ 드리프트가 연속 3회 감지되면
+ ⑦ 자동 재학습 ───  src/retraining/      ← monitoring/drift_worker.py 로 실행
+                     재학습 → 게이트(G1·G2) → 섀도우 관찰 → 승격 또는 거부
+                     거부 시 원인 추정(src/monitoring/cause_estimation.py) + RAG 조치 제안
 ```
 
 **핵심 설계**: 임계값을 라벨에서 역산하지 않습니다. train(정상) 데이터의 오차
@@ -107,29 +111,38 @@ RAG를 얹은 것이 이 파이프라인입니다.
 │   │   └── plotting.py             ·  혼동행렬·점수분포 등 시각화 (MLflow 첨부)
 │   │
 │   ├── serving/                    ⑥ 추론 서버
-│   │   ├── app.py                  ·  FastAPI 앱. 엔드포인트 3개:
+│   │   ├── app.py                  ·  FastAPI 앱. 엔드포인트 6개:
 │   │   │                           ·  GET /health · POST /predict · GET /drift-status
+│   │   │                           ·  POST /reload-model (승격 후 champion 재로드)
+│   │   │                           ·  POST /start-shadow · /stop-shadow (후보 병행 추론)
 │   │   └── inference.py            ·  판정 로직 + 피처별 기여도 순위화
 │   │
 │   ├── rag/                        ⑥ 현장 조치 가이드 생성
 │   │   ├── query.py                ·  기여도 상위 피처 → 검색 질의문 구성
 │   │   ├── features.py             ·  센서 코드 → 사람이 읽는 설명 매핑
 │   │   ├── retrieval.py            ·  임베딩 + FAISS 유사도 검색
-│   │   ├── generation.py           ·  검색 결과 기반 조치 가이드 생성 (OpenAI)
-│   │   └── guide.py                ·  위 단계 오케스트레이션. 정상 판정 시 고정 응답
+│   │   ├── generation.py           ·  검색 결과 기반 조치 가이드 생성 (OpenAI).
+│   │   │                           ·  재학습 거부 사유 설명용 프롬프트도 여기
+│   │   └── guide.py                ·  위 단계 오케스트레이션. 정상 판정 시 고정 응답.
+│   │                               ·  build_cause_guide: 원인 카테고리로 코퍼스 필터
 │   │
 │   ├── monitoring/                 ⑥ 운영 모니터링
 │   │   ├── logging.py              ·  요청/판정 이력 sqlite 적재
 │   │   ├── drift.py                ·  드리프트 판정. 입력 z>2.0, 불량비율>0.8
 │   │   ├── labels.py               ·  지연 도착 QC 라벨 적재/조회
-│   │   └── mlflow_logging.py       ·  드리프트 지표를 champion run에 기록
+│   │   ├── mlflow_logging.py       ·  드리프트 지표를 champion run에 기록
+│   │   ├── shadow_log.py           ·  섀도우 중 champion/후보 판정 쌍 기록 (shadow.db)
+│   │   └── cause_estimation.py     ·  재학습 거부 시 원인 추정. 스핀들 부하 계열 vs
+│   │                               ·  위치·속도 계열 z-score 누적 비교 →
+│   │                               ·  tool_wear / vibration_backlash
 │   │
 │   └── retraining/                 ⑦ 드리프트 트리거 자동 재학습
 │       ├── trigger.py              ·  연속 3회 flagged + 쿨다운 5일이면 발동
 │       ├── runner.py               ·  라벨 도착 정상배치로 재학습. scaler 재fit,
 │       │                           ·  eval 재스케일링, 산출물은 data/retrain/에 격리
-│       ├── gate.py                 ·  G1 원본 eval recall 회귀(−0.10 이내)
-│       │                           ·  G2 라벨 도착 구간 정확도 개선. 둘 다 만족해야 승격
+│       ├── gate.py                 ·  G1 원본 eval에서 놓친 불량 개수(champion+1 이내)
+│       │                           ·  G2 라벨 도착 구간 정확도 개선. 둘 다 만족해야
+│       │                           ·  섀도우 진입. evaluate_shadow: 섀도우 종료 판정
 │       └── promotion.py            ·  서빙 계약 확인 + 백업/교체/롤백
 │
 ├── scripts/                        ■ 주 파이프라인 실행 진입점
@@ -139,9 +152,10 @@ RAG를 얹은 것이 이 파이프라인입니다.
 │
 ├── rag/                            ■ RAG 지식 코퍼스 구축 (최초 1회)
 │   ├── build_corpus.py             ·  원문 → 청크 → 임베딩 → FAISS 인덱스
-│   └── sources/                    ·  공개 기술문서 원문 (로컬 저장, 웹 접근 불필요)
-│       ├── sandvik_milling_troubleshooting.md
-│       └── osha_machine_guarding_lockout.md
+│   └── sources/                    ·  공개 기술문서 원문 (로컬 저장·한국어 번역, 웹 접근 불필요)
+│       ├── sandvik_milling_troubleshooting.md   원인·조치 (진동 / 공구마모 / 이송·과부하)
+│       ├── osha_machine_guarding_lockout.md     안전수칙
+│       └── kamp_cnc_dataset_guide.md            데이터셋 배포기관 가이드북 발췌
 │
 ├── loocv/                          ■ 교차검증 — 고정 분할이 대표값인지 확인
 │   ├── run_loocv.py                ·  정상 실험 11개 leave-one-out
@@ -159,18 +173,20 @@ RAG를 얹은 것이 이 파이프라인입니다.
 ├── monitoring/                     ■ 드리프트 상황 시뮬레이션
 │   ├── simulate_drift.py           ·  운영 중 분포 변화 재현 (콘솔 출력)
 │   ├── simulate_timeline.py        ·  가상 운영 40일 타임라인 생성 + 주입
-│   │                               ·  시나리오 2종: temperature / tool_wear
+│   │                               ·  시나리오 3종: temperature(재학습이 정답) /
+│   │                               ·  tool_wear · fixture_loosening(게이트가 막아야 함)
 │   ├── sweep_drift_constants.py    ·  변형 상수를 실측 대역에 맞춰 산정
-│   └── drift_worker.py             ·  감시 워커 — 폴링/트리거/재학습/게이트/승격
+│   └── drift_worker.py             ·  감시 워커 — 폴링/트리거/재학습/게이트/섀도우/
+│                                   ·  승격. 거부 시 원인 추정 + RAG 조치를 MLflow 태그로
 │
-├── tests/                          ■ 단위 테스트 100개 — src/ 구조를 그대로 반영
-│   ├── preprocessing/  lstm_ae/  serving/  rag/  monitoring/
+├── tests/                          ■ 단위 테스트 165개 — src/ 구조를 그대로 반영
+│   ├── preprocessing/  lstm_ae/  serving/  rag/  monitoring/  retraining/
 │   └── test_mlops_dependencies.py  ·  MLOps 의존성 설치 확인
 │
 ├── docs/
 │   ├── STRUCTURE.md                ·  이 문서
-│   ├── specs/                      ·  기능별 설계 스펙 (10건)
-│   └── plans/                      ·  스펙에 대응하는 구현 계획 (10건)
+│   ├── specs/                      ·  기능별 설계 스펙 (13건)
+│   └── plans/                      ·  스펙에 대응하는 구현 계획 (13건)
 │
 ├── data/                           ■ git 미포함 — 별도 전달 필요
 │   ├── dataset/                    ·  원본 CNC 실험 CSV
@@ -178,10 +194,15 @@ RAG를 얹은 것이 이 파이프라인입니다.
 │   ├── model/                      ·  ③ 산출물: model.pt, evaluation_report.json 등
 │   ├── mlflow/                     ·  ④ MLflow sqlite DB + 모델 아티팩트
 │   ├── rag/                        ·  FAISS 인덱스 + 코퍼스
-│   ├── monitoring/                 ·  요청 이력 DB
+│   ├── monitoring/                 ·  요청 이력(requests.db) · QC 라벨(labels.db) ·
+│   │                               ·  섀도우 판정(shadow.db)
+│   ├── timeline/                   ·  ⑦ 시뮬레이션이 생성한 일자별 배치 CSV
+│   ├── retrain/                    ·  ⑦ 재학습 산출물 (run별 격리, 거부돼도 남음)
+│   ├── model_backup/               ·  ⑦ 승격 직전 정본 백업 (롤백용)
 │   └── guide/                      ·  참고 가이드북 PDF
 │
 ├── README.md                       ·  설치 · 실행 · 트러블슈팅
+├── Dockerfile, .dockerignore       ·  서빙 앱 컨테이너화 (data/는 볼륨으로 연결)
 ├── pyproject.toml                  ·  의존성 (uv 관리, PyTorch는 CPU 빌드)
 └── uv.lock
 ```
@@ -197,6 +218,7 @@ RAG를 얹은 것이 이 파이프라인입니다.
 | 3 | `src/lstm_ae/pipeline.py` | 학습~평가 전체 흐름 (가장 핵심) |
 | 4 | `src/lstm_ae/scoring.py` | 임계값을 어떻게 정하는지 |
 | 5 | `src/serving/app.py` | 실제 서비스 형태 |
+| 6 | `monitoring/drift_worker.py` | 운영 루프 전체(트리거 → 재학습 → 게이트 → 섀도우 → 승격/거부)가 한 파일에 |
 
 ## 6. 참고 사항
 
