@@ -4,8 +4,7 @@ EXTRA_MISSES_ALLOWED = 1
 def evaluate_gate(
     retrained_missed: int,
     champion_missed: int,
-    retrained_accuracy: float,
-    champion_accuracy: float,
+    g2: dict,
     extra_misses_allowed: int = EXTRA_MISSES_ALLOWED,
 ) -> dict:
     """승격 여부를 두 조건의 AND로 판정한다.
@@ -17,11 +16,13 @@ def evaluate_gate(
       precision을 보지 않는 이유는, 센서 좌표계가 이동한 환경에서 새 모델을
       옛 좌표계 eval에 적용하면 precision이 좌표계 차이 때문에 떨어지기 때문이다.
     G2 (근거): 라벨이 도착한 최근 구간에서 실제로 나아졌는가.
-      G1만으로는 모든 것을 불량이라 판정하는 모델도 놓친 개수 0으로 통과한다.
-      실제로 두 시나리오 모두에서 판정을 내린 것은 G2였다.
+      `evaluate_two_sided()`의 결과를 받는다 — 오탐과 놓침을 따로 세어 어느
+      쪽도 후퇴하지 않고 한쪽은 나아져야 하며, 정상 라벨이 없는 창은 통과
+      시키지 않는다. G1만으로는 모든 것을 불량이라 판정하는 모델도 놓친
+      개수 0으로 통과한다. 실제로 두 시나리오 모두에서 판정을 내린 것은 G2였다.
     """
     g1_pass = retrained_missed <= champion_missed + extra_misses_allowed
-    g2_pass = retrained_accuracy > champion_accuracy
+    g2_pass = g2["decision"] == "promoted"
 
     reasons = []
     if not g1_pass:
@@ -30,38 +31,15 @@ def evaluate_gate(
             f"허용 {champion_missed + extra_misses_allowed}건"
         )
     if not g2_pass:
-        reasons.append(
-            f"G2 개선 없음: {retrained_accuracy:.4f} <= {champion_accuracy:.4f}"
-        )
+        reasons.append(g2["reject_reason"])
 
     return {
         "decision": "promoted" if (g1_pass and g2_pass) else "rejected",
         "g1_pass": g1_pass,
         "g2_pass": g2_pass,
         "g1_missed": retrained_missed,
-        "g2_accuracy_delta": retrained_accuracy - champion_accuracy,
+        "g2": g2,
         "reject_reason": "; ".join(reasons),
-    }
-
-
-def accuracy_from_pairs(truths: list[str], predictions: list[str]) -> float:
-    """QC 진실 라벨과 모델 판정을 짝지어 정확도를 낸다. 둘 다 "good"/"bad" 문자열."""
-    if not truths or len(truths) != len(predictions):
-        raise ValueError(
-            f"라벨 {len(truths)}개와 판정 {len(predictions)}개의 길이가 다릅니다"
-        )
-    hits = sum(1 for truth, pred in zip(truths, predictions) if truth == pred)
-    return hits / len(truths)
-
-
-def evaluate_shadow(candidate_accuracy: float, champion_accuracy: float) -> dict:
-    """섀도우 기간 종료 후 최종 판정. G1은 트리거 시점에 이미 확인했고
-    원본 eval은 시간이 지나도 안 바뀌므로 재확인하지 않는다 — G2에
-    해당하는 정확도 비교만 반복한다."""
-    promoted = candidate_accuracy > champion_accuracy
-    return {
-        "decision": "promoted" if promoted else "rejected",
-        "accuracy_delta": candidate_accuracy - champion_accuracy,
     }
 
 
