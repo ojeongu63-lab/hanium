@@ -1,6 +1,6 @@
 import pytest
 
-from retraining.gate import accuracy_from_pairs, evaluate_gate, evaluate_shadow
+from retraining.gate import accuracy_from_pairs, evaluate_gate, evaluate_shadow, evaluate_two_sided
 
 # 현 champion 은 eval 불량 11개 중 10개를 잡는다 → 1건 놓침.
 CHAMPION_MISSED = 1
@@ -122,3 +122,74 @@ def test_shadow_rejects_when_candidate_not_better():
     verdict = evaluate_shadow(candidate_accuracy=0.7, champion_accuracy=0.7)
     assert verdict["decision"] == "rejected"
     assert verdict["accuracy_delta"] == pytest.approx(0.0)
+
+
+# ---- evaluate_two_sided: 오탐·놓침을 따로 세는 두 방향 규칙 -------------------
+
+def test_all_good_window_promotes_when_false_alarms_drop():
+    truths = ["good"] * 4
+    g2 = evaluate_two_sided(
+        truths,
+        ["bad", "bad", "good", "good"],   # champion 오탐 2
+        ["bad", "good", "good", "good"],  # 후보 오탐 1
+    )
+    assert g2["n_good"] == 4 and g2["n_bad"] == 0
+    assert g2["champion_false_alarms"] == 2 and g2["candidate_false_alarms"] == 1
+    assert g2["decision"] == "promoted"
+    assert g2["reject_reason"] == ""
+
+
+def test_all_good_window_rejects_when_false_alarms_equal():
+    truths = ["good"] * 3
+    g2 = evaluate_two_sided(truths, ["bad", "good", "good"], ["good", "bad", "good"])
+    assert g2["decision"] == "rejected"
+    assert "개선 없음" in g2["reject_reason"]
+
+
+def test_all_bad_window_rejects_as_unmeasurable():
+    # 09-02 fixture_loosening Day 34 — 후보가 놓침을 줄여도 오탐을 잴 수 없으면 거부.
+    truths = ["bad"] * 3
+    g2 = evaluate_two_sided(truths, ["good", "good", "good"], ["bad", "bad", "bad"])
+    assert g2["n_good"] == 0
+    assert g2["decision"] == "rejected"
+    assert "정상 라벨 없음" in g2["reject_reason"]
+
+
+def test_mixed_window_rejects_trading_misses_for_false_alarms():
+    # 09-02 fixture Day 29 형태: 후보가 놓침은 줄이고 오탐은 늘림.
+    truths = ["good", "good", "bad", "bad"]
+    champion = ["good", "good", "good", "bad"]   # 오탐 0, 놓침 1
+    candidate = ["bad", "good", "bad", "bad"]    # 오탐 1, 놓침 0
+    g2 = evaluate_two_sided(truths, champion, candidate)
+    assert g2["decision"] == "rejected"
+    assert "오탐 회귀" in g2["reject_reason"]
+
+
+def test_mixed_window_rejects_trading_false_alarms_for_misses():
+    # 09-02 tool_wear Day 30 형태: 후보가 오탐은 줄이고 놓침은 늘림.
+    truths = ["good", "good", "bad", "bad"]
+    champion = ["bad", "good", "bad", "bad"]     # 오탐 1, 놓침 0
+    candidate = ["good", "good", "good", "bad"]  # 오탐 0, 놓침 1
+    g2 = evaluate_two_sided(truths, champion, candidate)
+    assert g2["decision"] == "rejected"
+    assert "놓침 회귀" in g2["reject_reason"]
+
+
+def test_mixed_window_promotes_when_no_regression_and_one_side_improves():
+    truths = ["good", "good", "bad", "bad"]
+    champion = ["bad", "good", "good", "bad"]    # 오탐 1, 놓침 1
+    candidate = ["good", "good", "good", "bad"]  # 오탐 0, 놓침 1
+    g2 = evaluate_two_sided(truths, champion, candidate)
+    assert g2["decision"] == "promoted"
+    assert g2["reject_reason"] == ""
+
+
+def test_empty_window_rejects_as_unmeasurable():
+    g2 = evaluate_two_sided([], [], [])
+    assert g2["decision"] == "rejected"
+    assert "정상 라벨 없음" in g2["reject_reason"]
+
+
+def test_two_sided_rejects_length_mismatch():
+    with pytest.raises(ValueError, match="길이가 다릅니다"):
+        evaluate_two_sided(["good", "bad"], ["good"], ["good", "bad"])

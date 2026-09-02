@@ -63,3 +63,74 @@ def evaluate_shadow(candidate_accuracy: float, champion_accuracy: float) -> dict
         "decision": "promoted" if promoted else "rejected",
         "accuracy_delta": candidate_accuracy - champion_accuracy,
     }
+
+
+def evaluate_two_sided(
+    truths: list[str], champion_preds: list[str], candidate_preds: list[str]
+) -> dict:
+    """라벨 창을 정상/불량으로 나눠 오탐(정상→bad)과 놓침(불량→good)을 두 모델
+    각각 센 뒤 승격 여부를 낸다.
+
+    정확도 하나로 비교하면 창에 한 클래스만 있을 때 "더 자주 불량이라 하는"
+    모델이 무조건 이긴다(09-02 fixture_loosening Day 34에서 실제로 통과됨).
+    그래서 두 건수를 따로 보고, 한쪽을 다른 쪽과 맞바꾸는 후보와 오탐을 아예
+    잴 수 없는 창(정상 라벨 0건)은 통과시키지 않는다. 정상 라벨만 있으면
+    놓침 쪽은 G1이 맡는다 — temperature 시나리오의 기존 경로.
+
+    빈 창은 정상 라벨 0건이므로 거부. 세 리스트 길이가 다르면 ValueError.
+    """
+    if not (len(truths) == len(champion_preds) == len(candidate_preds)):
+        raise ValueError(
+            f"라벨 {len(truths)}개, champion 판정 {len(champion_preds)}개, "
+            f"후보 판정 {len(candidate_preds)}개의 길이가 다릅니다"
+        )
+    good = [i for i, t in enumerate(truths) if t == "good"]
+    bad = [i for i, t in enumerate(truths) if t == "bad"]
+
+    def false_alarms(preds: list[str]) -> int:
+        return sum(1 for i in good if preds[i] == "bad")
+
+    def misses(preds: list[str]) -> int:
+        return sum(1 for i in bad if preds[i] == "good")
+
+    counts = {
+        "n_good": len(good),
+        "n_bad": len(bad),
+        "champion_false_alarms": false_alarms(champion_preds),
+        "candidate_false_alarms": false_alarms(candidate_preds),
+        "champion_misses": misses(champion_preds),
+        "candidate_misses": misses(candidate_preds),
+    }
+    if counts["n_good"] == 0:
+        return {
+            **counts,
+            "decision": "rejected",
+            "reject_reason": "G2 판정 불가: 창에 정상 라벨 없음(오탐 회귀 확인 불가)",
+        }
+
+    fa_ok = counts["candidate_false_alarms"] <= counts["champion_false_alarms"]
+    miss_ok = counts["n_bad"] == 0 or counts["candidate_misses"] <= counts["champion_misses"]
+    improved = counts["candidate_false_alarms"] < counts["champion_false_alarms"] or (
+        counts["n_bad"] > 0 and counts["candidate_misses"] < counts["champion_misses"]
+    )
+
+    reasons = []
+    if not fa_ok:
+        reasons.append(
+            f"G2 오탐 회귀: 후보 {counts['candidate_false_alarms']}건 > "
+            f"champion {counts['champion_false_alarms']}건 (정상 {counts['n_good']}건 중)"
+        )
+    if not miss_ok:
+        reasons.append(
+            f"G2 놓침 회귀: 후보 {counts['candidate_misses']}건 > "
+            f"champion {counts['champion_misses']}건 (불량 {counts['n_bad']}건 중)"
+        )
+    if fa_ok and miss_ok and not improved:
+        reasons.append("G2 개선 없음: 오탐·놓침 모두 champion과 동일")
+
+    promoted = fa_ok and miss_ok and improved
+    return {
+        **counts,
+        "decision": "promoted" if promoted else "rejected",
+        "reject_reason": "; ".join(reasons),
+    }
