@@ -467,10 +467,27 @@ fixture_loosening Day 34와 정반대 — 곱셈 램프는 정상으로 학습�
 스펙 `02-cnc-machining/docs/specs/2026-09-02-cnc-two-sided-gate-design.md`
 (Part A·B), 계획 `02-cnc-machining/docs/plans/2026-09-02-cnc-two-sided-gate.md`.
 
-- [ ] Task 1 `evaluate_two_sided` — 오탐·놓침을 따로 세는 순수 함수 (TDD 8개)
-- [ ] Task 2 `evaluate_gate`가 두 방향 결과를 받도록, `evaluate_shadow`·`accuracy_from_pairs` 제거
-- [ ] Task 3 워커 통합 — `_gate_predictions`, 로그·MLflow 태그 교체, STRUCTURE/README 문구
-- [ ] Task 4 라이브 재현 3종(fixture 40일, tool_wear 40일, temperature 70일) → 스펙 정정 절, champion v1 복원
+- [x] Task 1 `evaluate_two_sided` — 오탐·놓침을 따로 세는 순수 함수 (TDD 8개)
+- [x] Task 2 `evaluate_gate`가 두 방향 결과를 받도록, `evaluate_shadow`·`accuracy_from_pairs` 제거
+- [x] Task 3 워커 통합 — `_gate_predictions`, 로그·MLflow 태그 교체, STRUCTURE/README 문구
+- [x] Task 4 라이브 재현 3종(fixture 40일, tool_wear 40일, temperature 70일) → 스펙 정정 절, champion v1 복원
+
+### 리뷰 — 두 방향 게이트 라이브 재현 (2026-09-02)
+
+| 시나리오 | 트리거 | 판정 | 원인 추정 | 기존 규칙과의 차이 |
+|---|---|---|---|---|
+| fixture_loosening 40일 | 5회 | 5회 모두 거부 | 5/5 vibration_backlash | Day 30(맞바꾸기)·Day 35(전부 불량 창)는 기존 규칙이면 통과였음 |
+| tool_wear 40일 | 5회 | 5회 모두 거부 | 5/5 tool_wear | 판정 동일, 사유가 정직해짐 |
+| temperature 70일 | 4회 + 승격 후 1회 | 거부 3회 → Day 37 통과 → 섀도우 → Day 64 승격(v63) | (범위 밖, tool_wear로 찍힘) | 08-25와 같은 흐름 |
+
+거부 사유 네 종류(개선 없음 / 오탐 회귀 / 놓침 회귀 / 정상 라벨 없음)가 전부
+실제로 나왔고, 거부 10건 모두 원인 추정·RAG 조치·새 태그 4종이 MLflow에
+남았다. 승격 후 champion을 `promote_model.py 1` + `restore_backup()`으로 v1
+복원(해시 원래대로). 상세 표는 스펙의 "실행 결과에 따른 정정" 절. 로그·DB는
+`data/monitoring/_<시나리오>_20260902_v2/`(temperature는 `_temperature_20260902/`).
+
+**사용자 결정(2026-09-02)**: 이 상태를 결과물로 고정한다. 추가 기능 작업은
+하지 않는다.
 
 **실행 중 배운 것**: `pkill -f 'drift_worker.py <시나리오>'`처럼 패턴에
 스크립트 인자를 넣으면 그 명령을 담은 셸 자신도 매칭돼 먼저 죽는다 —
