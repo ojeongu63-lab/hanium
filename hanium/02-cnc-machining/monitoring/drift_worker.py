@@ -21,7 +21,7 @@ from lstm_ae.tracking import (  # noqa: E402
     REGISTERED_MODEL_NAME,
     promote_to_champion,
 )
-from retraining.gate import evaluate_gate, evaluate_shadow  # noqa: E402
+from retraining.gate import evaluate_gate, evaluate_two_sided  # noqa: E402
 from retraining.promotion import swap_with_rollback, verify_serving_contract  # noqa: E402
 from retraining.runner import run_retraining  # noqa: E402
 from retraining.trigger import days_to_process, is_drift_flagged, should_retrain  # noqa: E402
@@ -118,26 +118,24 @@ def _decide_and_start_shadow(client, state, result, current_day, scenario) -> st
         print(f"  거부 — 서빙 계약 미충족: {missing}", flush=True)
         return "rejected"
 
-    champion_accuracy, retrained_accuracy, sample_size, champion_contributions = _gate_accuracies(
+    truths, champion_preds, retrained_preds, champion_contributions = _gate_predictions(
         result, current_day, scenario
     )
+    g2 = evaluate_two_sided(truths, champion_preds, retrained_preds)
     verdict = evaluate_gate(
         retrained_missed=result["missed"],
         champion_missed=state.champion_missed,
-        retrained_accuracy=retrained_accuracy,
-        champion_accuracy=champion_accuracy,
+        g2=g2,
     )
 
     extra_tags = {
         "gate_g1_missed": verdict["g1_missed"],
-        "gate_g2_accuracy_delta": verdict["g2_accuracy_delta"],
-        "gate_g2_sample_size": sample_size,
+        "gate_g2_sample_size": len(truths),
+        **_g2_tags("gate_g2", g2),
     }
 
     print(f"  게이트: G1 놓침={verdict['g1_missed']}건 (champion {state.champion_missed}건, "
-          f"허용 {state.champion_missed + 1}건) / "
-          f"G2 {retrained_accuracy:.2f} vs {champion_accuracy:.2f} "
-          f"(표본 {sample_size}건)", flush=True)
+          f"허용 {state.champion_missed + 1}건) / G2 {_describe_g2(g2)}", flush=True)
 
     if verdict["decision"] == "rejected":
         cause = estimate_cause(champion_contributions)
@@ -190,6 +188,27 @@ def _start_shadow(client, state, result, current_day) -> None:
     )
 
 
+def _describe_g2(g2: dict) -> str:
+    """콘솔 로그용 한 줄. 정상/불량이 0건인 쪽은 건수만 찍는다."""
+    good = f"정상 {g2['n_good']}건"
+    if g2["n_good"]:
+        good += f" — 오탐 후보 {g2['candidate_false_alarms']} vs champion {g2['champion_false_alarms']}"
+    bad = f"불량 {g2['n_bad']}건"
+    if g2["n_bad"]:
+        bad += f" — 놓침 후보 {g2['candidate_misses']} vs champion {g2['champion_misses']}"
+    return f"{good} · {bad}"
+
+
+def _g2_tags(prefix: str, g2: dict) -> dict:
+    """MLflow 태그. delta 는 후보 − champion (음수가 개선)."""
+    return {
+        f"{prefix}_n_good": g2["n_good"],
+        f"{prefix}_n_bad": g2["n_bad"],
+        f"{prefix}_fa_delta": g2["candidate_false_alarms"] - g2["champion_false_alarms"],
+        f"{prefix}_miss_delta": g2["candidate_misses"] - g2["champion_misses"],
+    }
+
+
 def _predict_labels(batch_paths, model, scaler_dict, threshold, baseline, window_size):
     """배치들을 주어진 모델로 판정한다. HTTP를 타지 않는다 — /predict 를 부르면
     요청 로그에 게이트 평가용 가짜 트래픽이 쌓여 드리프트 윈도우가 오염된다."""
@@ -208,13 +227,16 @@ def _predict_labels(batch_paths, model, scaler_dict, threshold, baseline, window
     return results
 
 
-def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[float, float, int, list[list[dict]]]:
-    """G2 입력 — 라벨 도착 구간에서 champion과 재학습 모델의 정확도, 그리고
-    champion의 배치별 feature_contributions(원인 추정용).
+def _gate_predictions(
+    result: dict, current_day: int, scenario: str
+) -> tuple[list[str], list[str], list[str], list[list[dict]]]:
+    """G2 입력 — 라벨 도착 구간의 (정답, champion 판정, 재학습 모델 판정)과
+    champion의 배치별 feature_contributions(원인 추정용). 판정 자체는
+    retraining.gate 가 한다.
 
     두 모델을 같은 배치에 대고 직접 돌려 비교한다. champion 판정을 predict_log
     에서 꺼내오지 않는 이유는 배치 식별자가 로그에 없어 짝을 맞출 수 없기
-    때문이고, /predict 를 다시 부르지 않는 이유는 위 _predict_labels 주석과 같다.
+    때문이고, /predict 를 다시 부르지 않는 이유는 _predict_labels 주석과 같다.
     """
     import json
 
@@ -223,13 +245,12 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
     from lstm_ae.model import LSTMAutoencoder
     from monitoring.labels import get_arrived_labels
     from preprocessing.columns import FEATURE_COLUMNS
-    from retraining.gate import accuracy_from_pairs
     from retraining.runner import TRAINING_CONFIG
     from serving.app import load_model_state
 
     arrived = get_arrived_labels(current_day, LABELS_DB)[-GATE_SAMPLE_SIZE:]
     if not arrived:
-        return 0.0, 0.0, 0, []
+        return [], [], [], []
 
     timeline_dir = ROOT / "data" / "timeline" / scenario
     batch_paths = [timeline_dir / f"{r['batch_id']}.csv" for r in arrived]
@@ -261,19 +282,13 @@ def _gate_accuracies(result: dict, current_day: int, scenario: str) -> tuple[flo
     )
     retrained_preds = [r["predicted_label_text"] for r in retrained_results]
 
-    return (
-        accuracy_from_pairs(truths, champion_preds),
-        accuracy_from_pairs(truths, retrained_preds),
-        len(truths),
-        champion_contributions,
-    )
+    return truths, champion_preds, retrained_preds, champion_contributions
 
 
 def _check_shadow(client, state, current_day, scenario) -> str:
     """섀도우가 끝났는지 확인하고, 끝났으면 최종 판정까지 수행한다."""
     from monitoring.labels import get_arrived_labels
     from monitoring.shadow_log import get_shadow_predictions
-    from retraining.gate import accuracy_from_pairs
 
     arrived = get_arrived_labels(current_day, LABELS_DB)
     # 라벨은 생산일 기준으로 지연 도착하므로, "새로 도착한 라벨"이 아니라
@@ -298,19 +313,14 @@ def _check_shadow(client, state, current_day, scenario) -> str:
     champion_preds = [predictions[b]["champion_label"] for b in matched]
     candidate_preds = [predictions[b]["candidate_label"] for b in matched]
 
-    champion_accuracy = accuracy_from_pairs(truths, champion_preds)
-    candidate_accuracy = accuracy_from_pairs(truths, candidate_preds)
-    verdict = evaluate_shadow(candidate_accuracy, champion_accuracy)
+    verdict = evaluate_two_sided(truths, champion_preds, candidate_preds)
 
     mlflow_client = MlflowClient()
     _tag(mlflow_client, state.shadow.run_id, scenario, current_day,
-         decision=f"shadow_{verdict['decision']}", reason="",
-         extra={"shadow_accuracy_delta": verdict["accuracy_delta"],
-                "shadow_candidate_accuracy": candidate_accuracy,
-                "shadow_champion_accuracy": champion_accuracy})
+         decision=f"shadow_{verdict['decision']}", reason=verdict["reject_reason"],
+         extra=_g2_tags("shadow", verdict))
 
-    print(f"  섀도우 종료 — candidate {candidate_accuracy:.2f} vs champion "
-          f"{champion_accuracy:.2f} → {verdict['decision']}", flush=True)
+    print(f"  섀도우 종료 — {_describe_g2(verdict)} → {verdict['decision']}", flush=True)
 
     if verdict["decision"] == "promoted":
         _promote_shadow(client, state)
