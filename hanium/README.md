@@ -15,9 +15,9 @@ p95 임계값 기준).
 ## 어디부터 보면 되나요
 
 **→ [`02-cnc-machining/`](02-cnc-machining/) 이 본 결과물입니다.** 이 폴더의
-README부터 읽으시면 됩니다. 파이프라인의 폴더·파일 구성과 각 역할은
+README부터 읽으시면 됩니다. 파이프라인의 세 단계와 폴더 역할은
 **[`02-cnc-machining/docs/STRUCTURE.md`](02-cnc-machining/docs/STRUCTURE.md)**에
-주석 형태로 정리돼 있습니다.
+한 장으로 정리돼 있습니다.
 
 ## 왜 이 방법론을 신뢰할 수 있는가
 

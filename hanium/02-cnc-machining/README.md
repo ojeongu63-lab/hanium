@@ -289,7 +289,7 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 
 ## 4. 프로젝트 구조
 
-> 파이프라인 흐름과 파일별 역할까지 주석으로 정리한 문서가 따로 있다 —
+> 세 단계 흐름과 폴더 역할을 한 장으로 정리한 문서가 따로 있다 —
 > **[`docs/STRUCTURE.md`](docs/STRUCTURE.md)**. 처음 보는 사람에게 공유하기 좋다.
 
 폴더가 두 종류로 나뉜다. **`src/`는 import해서 쓰는 라이브러리 코드**이고,
