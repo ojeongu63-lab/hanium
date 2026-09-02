@@ -12,9 +12,9 @@ OUT_DIR = ROOT / "data" / "rag"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 SANDVIK_SECTION_CATEGORY = {
-    "1. Vibration": "vibration_backlash",
-    "2. Insert Wear (Tool Wear)": "tool_wear",
-    "3. Chip Issues (Feed / Overload)": "feed_overload",
+    "1. 진동": "vibration_backlash",
+    "2. 인서트 마모(공구 마모)": "tool_wear",
+    "3. 칩 배출 문제(이송/과부하)": "feed_overload",
 }
 SANDVIK_META = {
     "title": "Sandvik Coromant Milling Troubleshooting",

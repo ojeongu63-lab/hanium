@@ -1,35 +1,33 @@
-# OSHA — Machine Guarding & Lockout/Tagout for Milling Machines
+# OSHA — 밀링 머신의 기계 방호(Machine Guarding)와 잠금·표시(Lockout/Tagout)
 
-Source: https://www.osha.gov/etools/machine-guarding/introduction/general-requirements
-Additional reference: https://www.osha.gov/laws-regs/standardinterpretations/2005-08-24
-Fetched: 2026-08-12
+원문: https://www.osha.gov/etools/machine-guarding/introduction/general-requirements
+추가 참고 원문: https://www.osha.gov/laws-regs/standardinterpretations/2005-08-24
+원문 수집일: 2026-08-12
+한국어 번역: 이 프로젝트에서 수행 (2026-08-26)
 fault_category: general
 content_type: safety
 
-## Point-of-operation guarding
+## 가공점(Point-of-operation) 방호
 
-Milling machines are listed among machines that typically require point-of-operation
-guarding under 29 CFR 1910.212(a)(3)(iv)(e). One or more methods of machine guarding
-must be provided to protect the operator and other employees in the machine area from
-hazards created by point of operation, ingoing nip points, rotating parts, flying chips
-and sparks. Guards must be affixed to the machine where possible, and the guard itself
-must not create an additional hazard.
+밀링 머신은 29 CFR 1910.212(a)(3)(iv)(e)에 따라 가공점(point-of-operation) 방호가
+일반적으로 요구되는 기계 목록에 포함된다. 가공점, 물림점(ingoing nip points), 회전
+부품, 날아오는 칩과 스파크로부터 작업자와 주변 작업자를 보호하기 위해 하나 이상의
+기계 방호 수단을 제공해야 한다. 방호물은 가능한 한 기계에 고정되어야 하며, 방호물
+자체가 추가적인 위험을 만들어서는 안 된다.
 
-## Lockout/Tagout before servicing or maintenance
+## 정비·보수 전 잠금·표시(Lockout/Tagout)
 
-Under 29 CFR 1910.147(c)(1), the employer must establish an energy control program
-consisting of energy control procedures, employee training, and periodic inspections to
-ensure that before any employee performs any servicing or maintenance on a machine or
-equipment, the machine or equipment is isolated from the energy source and rendered
-inoperative.
+29 CFR 1910.147(c)(1)에 따라, 사업주는 작업자가 기계나 설비에 대해 정비 또는 보수
+작업을 하기 전에 해당 기계나 설비가 에너지원으로부터 격리되어 작동 불가능한 상태가
+되도록, 에너지 통제 절차·작업자 교육·주기적 점검으로 구성된 에너지 통제 프로그램을
+수립해야 한다.
 
-## Exceptions (minor servicing, cord-and-plug equipment)
+## 예외(경미한 정비, 코드·플러그 방식 장비)
 
-An energy control procedure is not required if a tool-change activity meets all of the
-criteria of the minor servicing exception, or if the equipment is cord-and-plug
-connected and (1) the employer unplugs the machine, (2) unplugging controls all of the
-hazardous energy the employee may be exposed to, and (3) the plug remains in the
-exclusive control of the employee performing the work. Where used, local disconnects or
-control switches must be (1) placed in the "off" position, (2) provide effective
-employee protection through proper design and application, and (3) remain under the
-exclusive control of the employee performing the task.
+공구 교체 작업이 경미한 정비(minor servicing) 예외의 모든 요건을 충족하거나, 장비가
+코드·플러그 방식으로 연결되어 있고 (1) 사업주가 기계의 플러그를 뽑고, (2) 플러그를
+뽑는 것으로 작업자가 노출될 수 있는 모든 위험 에너지가 통제되며, (3) 그 플러그가
+작업을 수행하는 작업자의 배타적 통제 하에 있는 경우에는 에너지 통제 절차가 요구되지
+않는다. 로컬 차단기나 제어 스위치를 사용하는 경우에는 (1) "off" 위치에 두고, (2) 적절한
+설계와 적용으로 작업자를 효과적으로 보호하며, (3) 작업을 수행하는 작업자의 배타적
+통제 하에 유지되어야 한다.

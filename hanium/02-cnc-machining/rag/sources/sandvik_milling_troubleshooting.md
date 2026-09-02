@@ -1,86 +1,87 @@
-# Sandvik Coromant — Milling Troubleshooting
+# Sandvik Coromant — 밀링 트러블슈팅
 
-Source: https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling
-Fetched: 2026-08-12
-fault_category candidates: vibration_backlash (section 1), tool_wear (section 2), feed_overload (section 3)
+원문: https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling
+원문 수집일: 2026-08-12
+한국어 번역: 이 프로젝트에서 수행 (2026-08-26)
+fault_category candidates: vibration_backlash (섹션 1), tool_wear (섹션 2), feed_overload (섹션 3)
 
-## 1. Vibration
+## 1. 진동
 
-### Weak fixture
-Cause: Weak fixture.
-Solution: Assess the direction of the cutting forces and provide adequate support or improve the fixture. Reduce the cutting forces by decreasing the cutting depth, ap. Select a coarse and differentially pitched cutter. Select a geometry with a small corner radius and small parallel land.
+### 약한 고정구
+원인: 고정구가 약함.
+해결책: 절삭력의 방향을 파악해 충분한 지지대를 제공하거나 고정구를 개선한다. 절삭 깊이(ap)를 줄여 절삭력을 낮춘다. 피치가 크고 differential pitch(불균등 피치)를 가진 커터를 선택한다. 코너 반경과 평행 랜드가 작은 지오메트리를 선택한다.
 
-### Axially weak workpiece
-Cause: Axial cutting forces are too high.
-Solution: Consider a square shoulder cutter (90-degree entering angle) with positive geometry. Select an insert with L-geometry. Decrease axial cutting force with lower depth of cut, smaller corner radius and parallel land. Select a coarse-pitch cutter with differential pitch. Check tool wear. Check tool holder run-out.
+### 축 방향으로 약한 공작물
+원인: 축 방향 절삭력이 너무 큼.
+해결책: 포지티브 지오메트리를 가진 스퀘어 숄더 커터(진입각 90도)를 고려한다. L-지오메트리 인서트를 선택한다. 절삭 깊이를 낮추고, 코너 반경과 평행 랜드를 줄여 축 방향 절삭력을 낮춘다. differential pitch를 가진 큰 피치 커터를 선택한다. 공구 마모를 점검한다. 툴 홀더의 런아웃을 점검한다.
 
-### Too long tool overhang
-Cause: Tool overhang distance is excessive.
-Solution: Minimize overhang. Use coarse-pitch cutters with differential pitch. Balance radial and axial cutting forces with a 45 degree entering angle. Increase feed per tooth. Reduce axial depth of cut, af. Use up milling in finishing.
+### 과도한 공구 돌출 길이
+원인: 공구 돌출 거리가 과도함.
+해결책: 돌출 길이를 최소화한다. differential pitch를 가진 큰 피치 커터를 사용한다. 진입각 45도로 반경/축 방향 절삭력의 균형을 맞춘다. 날당 이송량(fz)을 늘린다. 축 방향 절삭 깊이(af)를 줄인다. 다듬질 가공에서는 상향 밀링을 사용한다.
 
-### Milling square shoulder with weak spindle
-Solution: Select smallest possible cutter diameter. Select a positive and light-cutting cutter and insert. Try up milling.
+### 약한 스핀들로 사각 숄더 밀링
+해결책: 가능한 가장 작은 지름의 커터를 선택한다. 포지티브하고 가볍게 절삭되는 커터와 인서트를 선택한다. 상향 밀링을 시도한다.
 
-### Irregular table feed
-Solution: Try up milling. Tighten machine feed mechanism.
+### 불규칙한 테이블 이송
+해결책: 상향 밀링을 시도한다. 기계 이송 기구를 조인다.
 
-### Cutting data
-Solution: Reduce cutting speed, vc. Increase feed, fz. Change cutting depth, ap.
+### 절삭 조건(커팅 데이터)
+해결책: 절삭 속도(vc)를 낮춘다. 이송량(fz)을 늘린다. 절삭 깊이(ap)를 바꾼다.
 
-## 2. Insert Wear (Tool Wear)
+## 2. 인서트 마모(공구 마모)
 
-### Flank wear - Rapid wear
-Cause: Cutting speed too high. Insufficient wear resistance. Feed, fz, too low.
-Solution: Reduce cutting speed, vc. Select a more wear-resistant grade. Increase feed, fz.
+### 플랭크 마모 - 급속 마모
+원인: 절삭 속도가 너무 높음. 내마모성 부족. 이송량(fz)이 너무 낮음.
+해결책: 절삭 속도(vc)를 낮춘다. 내마모성이 더 높은 등급을 선택한다. 이송량(fz)을 늘린다.
 
-### Flank wear - Excessive wear
-Cause: Vibration. Re-cutting of chips. Burr formation on component. Poor surface finish. Heat generation. Excessive noise.
-Solution: Increase feed, fz. Use down milling. Evacuate chips effectively using compressed air.
+### 플랭크 마모 - 과도한 마모
+원인: 진동. 칩 재절삭. 공작물에 버(burr) 발생. 표면 품질 저하. 발열. 과도한 소음.
+해결책: 이송량(fz)을 늘린다. 하향 밀링을 사용한다. 압축 공기로 칩을 효과적으로 배출한다.
 
-### Flank wear - Uneven wear
-Cause: Tool run-out. Vibration. Radial forces too high.
-Solution: Reduce run-out below 0.02 mm. Check chuck and collet. Minimize tool protrusion. Use fewer teeth in cut. Choose a larger tool diameter. Split axial cutting depth into more than one pass.
+### 플랭크 마모 - 불균일 마모
+원인: 공구 런아웃. 진동. 반경 방향 힘이 너무 큼.
+해결책: 런아웃을 0.02mm 이하로 줄인다. 척과 콜릿을 점검한다. 공구 돌출을 최소화한다. 절삭에 관여하는 날의 수를 줄인다. 더 큰 지름의 공구를 선택한다. 축 방향 절삭 깊이를 여러 패스로 나눈다.
 
-### Crater wear
-Cause: Diffusion wear due to cutting temperatures that are too high on the rake face.
-Solution: Select an Al2O3 coated grade. Select a positive insert geometry. Reduce the speed to obtain a lower temperature.
+### 크레이터 마모
+원인: 레이크 면의 절삭 온도가 너무 높아 발생하는 확산 마모.
+해결책: Al2O3 코팅 등급을 선택한다. 포지티브 인서트 지오메트리를 선택한다. 속도를 줄여 온도를 낮춘다.
 
-### Plastic deformation
-Cause: Cutting temperature and pressure too high.
-Solution: Select a more wear resistant (harder) grade. Reduce cutting speed, vc. Reduce feed, fz.
+### 소성 변형
+원인: 절삭 온도와 압력이 너무 높음.
+해결책: 내마모성(경도)이 더 높은 등급을 선택한다. 절삭 속도(vc)를 낮춘다. 이송량(fz)을 줄인다.
 
-### Chipping - chip hammering
-Cause: The chips are deflected against the cutting edge.
-Solution: Select a tougher grade. Select an insert with a stronger cutting edge. Increase cutting speed, vc. Select a positive geometry. Improve stability.
+### 치핑(날끝 파손) - 칩 해머링
+원인: 칩이 절삭날 쪽으로 튕겨 부딪힘.
+해결책: 더 인성이 강한 등급을 선택한다. 절삭날이 더 강한 인서트를 선택한다. 절삭 속도(vc)를 높인다. 포지티브 지오메트리를 선택한다. 안정성을 개선한다.
 
-### Chipping - frittering
-Cause: Grade too brittle. Insert geometry too weak. Built-up edge.
-Solution: Select a tougher grade. Select an insert with a stronger geometry. Increase cutting speed, vc, or select a positive geometry.
+### 치핑(날끝 파손) - 프리터링(잘게 부서짐)
+원인: 등급이 너무 취성이 강함. 인서트 지오메트리가 너무 약함. 구성인선 발생.
+해결책: 더 인성이 강한 등급을 선택한다. 지오메트리가 더 강한 인서트를 선택한다. 절삭 속도(vc)를 높이거나 포지티브 지오메트리를 선택한다.
 
-### Notch wear
-Cause: Work hardening materials. Skin and scale.
-Solution: Reduce cutting speed, vc. Select a tougher grade. Use a stronger geometry. Use a cutting angle closer to 45 degrees. Use round inserts.
+### 노치 마모
+원인: 가공 경화되는 소재. 스킨(skin)과 스케일(scale).
+해결책: 절삭 속도(vc)를 낮춘다. 더 인성이 강한 등급을 선택한다. 더 강한 지오메트리를 사용한다. 진입각을 45도에 가깝게 사용한다. 원형 인서트를 사용한다.
 
-### Thermal cracks
-Cause: Intermittent machining. Varying cutting fluid supply.
-Solution: Select a tougher grade with better resistance to thermal shocks. Cutting fluid should be applied copiously or not at all.
+### 열 균열
+원인: 단속 가공. 절삭유 공급이 일정하지 않음.
+해결책: 열충격 저항성이 더 좋은 인성 등급을 선택한다. 절삭유는 충분히 공급하거나 아예 공급하지 않는다.
 
-### Built-up edge
-Cause: Cutting zone temperature is too low. Very sticky material, such as low-carbon steel, stainless steels, and aluminium.
-Solution: Increase cutting speed, vc. Change to a more suitable insert geometry.
+### 구성인선(빌트업 엣지)
+원인: 절삭 영역 온도가 너무 낮음. 저탄소강, 스테인리스강, 알루미늄처럼 점착성이 강한 소재.
+해결책: 절삭 속도(vc)를 높인다. 더 적합한 인서트 지오메트리로 변경한다.
 
-### Built-up edge - welded
-Cause: Low cutting speed, vc. Low feed, fz. Negative cutting geometry.
-Solution: Increase cutting speed, vc. Increase feed, fz. Select a positive geometry. Use oil mist or cutting fluid.
+### 구성인선 - 용착
+원인: 낮은 절삭 속도(vc). 낮은 이송량(fz). 네거티브 절삭 지오메트리.
+해결책: 절삭 속도(vc)를 높인다. 이송량(fz)을 늘린다. 포지티브 지오메트리를 선택한다. 오일 미스트나 절삭유를 사용한다.
 
-## 3. Chip Issues (Feed / Overload)
+## 3. 칩 배출 문제(이송/과부하)
 
-### Chip jamming
-Situation: Common obstacle when full slotting, especially in long-chipping materials.
-Cause: Insert corner damage. Edge chipping and breakage. Re-cutting of chips.
-Solution: Improve chip evacuation by using rich and well directed cutting fluid or compressed air. Reduce feed, fz. Split deep cuts into several passes. Try up milling in deep slotting. Use coarse pitch cutters. Use solid carbide end mills or exchangeable-head mills with two or maximum three cutting edges.
+### 칩 걸림(재밍)
+상황: 특히 긴 칩이 생기는 소재에서 풀 슬로팅 시 흔히 발생하는 문제.
+원인: 인서트 코너 손상. 절삭날 치핑 및 파손. 칩 재절삭.
+해결책: 풍부하고 방향이 잘 잡힌 절삭유나 압축 공기로 칩 배출을 개선한다. 이송량(fz)을 줄인다. 깊은 절삭을 여러 패스로 나눈다. 깊은 슬로팅에서는 상향 밀링을 시도한다. 큰 피치 커터를 사용한다. 절삭날이 2~3개인 솔리드 카바이드 엔드밀이나 교환식 헤드 밀을 사용한다.
 
-### Re-cutting of chips
-Situation: Appears in full slotting and pocketing, especially in titanium. Also common when milling deep cavities and pockets on vertical machines.
-Cause: Cutting edge fractures. Harmful for tool life and security. Chip jamming.
-Solution: Evacuate chips effectively by compressed air or copious cutting fluid flow, preferably internal coolant. Change cutter position and tool path strategy. Reduce feed, fz. Split deep cuts into several passes.
+### 칩 재절삭
+상황: 풀 슬로팅과 포켓 가공, 특히 티타늄 가공에서 나타남. 수직 머신에서 깊은 캐비티와 포켓을 밀링할 때도 흔함.
+원인: 절삭날 파손. 공구 수명과 안전성에 해로움. 칩 걸림.
+해결책: 압축 공기나 충분한 절삭유(가급적 내부 냉각)로 칩을 효과적으로 배출한다. 커터 위치와 툴 패스 전략을 바꾼다. 이송량(fz)을 줄인다. 깊은 절삭을 여러 패스로 나눈다.
