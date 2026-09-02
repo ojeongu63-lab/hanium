@@ -462,6 +462,16 @@ fixture_loosening Day 34와 정반대 — 곱셈 램프는 정상으로 학습�
 불량 창 놓침 6 → 14). **결정: 게이트(Part A·B)만 구현, 보정(Part C)은
 보류.** 상세 표는 스펙의 "구현 전 데이터 확인" 절.
 
+## 두 방향 게이트 구현 (2026-09-02)
+
+스펙 `02-cnc-machining/docs/specs/2026-09-02-cnc-two-sided-gate-design.md`
+(Part A·B), 계획 `02-cnc-machining/docs/plans/2026-09-02-cnc-two-sided-gate.md`.
+
+- [ ] Task 1 `evaluate_two_sided` — 오탐·놓침을 따로 세는 순수 함수 (TDD 8개)
+- [ ] Task 2 `evaluate_gate`가 두 방향 결과를 받도록, `evaluate_shadow`·`accuracy_from_pairs` 제거
+- [ ] Task 3 워커 통합 — `_gate_predictions`, 로그·MLflow 태그 교체, STRUCTURE/README 문구
+- [ ] Task 4 라이브 재현 3종(fixture 40일, tool_wear 40일, temperature 70일) → 스펙 정정 절, champion v1 복원
+
 **실행 중 배운 것**: `pkill -f 'drift_worker.py <시나리오>'`처럼 패턴에
 스크립트 인자를 넣으면 그 명령을 담은 셸 자신도 매칭돼 먼저 죽는다 —
 PID 파일(`kill $(cat worker.pid)`)이나 `pgrep -f '[d]rift_worker'` 형태로.
