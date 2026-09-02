@@ -1,0 +1,234 @@
+{
+  "predicted_label": 1,
+  "predicted_label_text": "bad",
+  "score": 3.2464022636413574,
+  "threshold": 0.8566220998764038,
+  "method": "mean",
+  "feature_contributions": [
+    {
+      "feature": "Y_OutputPower",
+      "error": 10.95221996307373,
+      "z_score": 35.59379959106445
+    },
+    {
+      "feature": "X_OutputPower",
+      "error": 10.027070045471191,
+      "z_score": 21.119426727294922
+    },
+    {
+      "feature": "Z_ActualVelocity",
+      "error": 4.30452299118042,
+      "z_score": 19.783517837524414
+    },
+    {
+      "feature": "Z_SetVelocity",
+      "error": 4.303775310516357,
+      "z_score": 19.753963470458984
+    },
+    {
+      "feature": "Y_SetVelocity",
+      "error": 7.016984939575195,
+      "z_score": 18.42654037475586
+    },
+    {
+      "feature": "X_ActualVelocity",
+      "error": 7.847874641418457,
+      "z_score": 18.37929344177246
+    },
+    {
+      "feature": "X_SetVelocity",
+      "error": 7.720850467681885,
+      "z_score": 17.984556198120117
+    },
+    {
+      "feature": "Y_DCBusVoltage",
+      "error": 2.463874578475952,
+      "z_score": 17.156641006469727
+    },
+    {
+      "feature": "Y_ActualVelocity",
+      "error": 6.864138126373291,
+      "z_score": 17.058284759521484
+    },
+    {
+      "feature": "Y_OutputVoltage",
+      "error": 5.074936389923096,
+      "z_score": 16.29474639892578
+    },
+    {
+      "feature": "S_CurrentFeedback",
+      "error": 1.0701028108596802,
+      "z_score": 16.099544525146484
+    },
+    {
+      "feature": "X_OutputVoltage",
+      "error": 6.079855918884277,
+      "z_score": 15.95197582244873
+    },
+    {
+      "feature": "S_DCBusVoltage",
+      "error": 1.1037098169326782,
+      "z_score": 14.508050918579102
+    },
+    {
+      "feature": "S_OutputPower",
+      "error": 1.0047589540481567,
+      "z_score": 13.604207992553711
+    },
+    {
+      "feature": "S_OutputVoltage",
+      "error": 0.8883594274520874,
+      "z_score": 10.804569244384766
+    },
+    {
+      "feature": "S_SetVelocity",
+      "error": 0.8711901903152466,
+      "z_score": 10.477021217346191
+    },
+    {
+      "feature": "Z_SetPosition",
+      "error": 0.9837338924407959,
+      "z_score": 9.21065616607666
+    },
+    {
+      "feature": "Z_ActualPosition",
+      "error": 0.9544945955276489,
+      "z_score": 9.01244831085205
+    },
+    {
+      "feature": "S_ActualVelocity",
+      "error": 0.7899681329727173,
+      "z_score": 8.936424255371094
+    },
+    {
+      "feature": "Y_ActualAcceleration",
+      "error": 7.47162389755249,
+      "z_score": 8.717053413391113
+    },
+    {
+      "feature": "Y_CurrentFeedback",
+      "error": 1.7280380725860596,
+      "z_score": 8.6218843460083
+    },
+    {
+      "feature": "X_DCBusVoltage",
+      "error": 1.936909794807434,
+      "z_score": 8.583560943603516
+    },
+    {
+      "feature": "X_SetAcceleration",
+      "error": 9.321666717529297,
+      "z_score": 8.183239936828613
+    },
+    {
+      "feature": "Y_SetPosition",
+      "error": 0.9493075013160706,
+      "z_score": 7.9582037925720215
+    },
+    {
+      "feature": "Y_ActualPosition",
+      "error": 0.9400594234466553,
+      "z_score": 7.796034336090088
+    },
+    {
+      "feature": "S_SetAcceleration",
+      "error": 2.8892877101898193,
+      "z_score": 6.770036697387695
+    },
+    {
+      "feature": "X_SetPosition",
+      "error": 0.8611453771591187,
+      "z_score": 6.277674198150635
+    },
+    {
+      "feature": "X_ActualPosition",
+      "error": 0.8589787483215332,
+      "z_score": 6.09320068359375
+    },
+    {
+      "feature": "X_CurrentFeedback",
+      "error": 1.2158311605453491,
+      "z_score": 5.472209930419922
+    },
+    {
+      "feature": "X_ActualAcceleration",
+      "error": 3.863189220428467,
+      "z_score": 5.361298084259033
+    },
+    {
+      "feature": "Y_SetAcceleration",
+      "error": 7.268270969390869,
+      "z_score": 4.807610034942627
+    },
+    {
+      "feature": "S_OutputCurrent",
+      "error": 0.9809133410453796,
+      "z_score": 3.844604015350342
+    },
+    {
+      "feature": "M_CURRENT_FEEDRATE",
+      "error": 0.8938533067703247,
+      "z_score": 3.6900546550750732
+    },
+    {
+      "feature": "Z_SetAcceleration",
+      "error": 2.631556272506714,
+      "z_score": 3.3576064109802246
+    },
+    {
+      "feature": "Z_ActualAcceleration",
+      "error": 2.2582030296325684,
+      "z_score": 3.0327939987182617
+    },
+    {
+      "feature": "X_OutputCurrent",
+      "error": 1.915820837020874,
+      "z_score": 3.011230707168579
+    },
+    {
+      "feature": "Y_OutputCurrent",
+      "error": 1.7358568906784058,
+      "z_score": 2.213350534439087
+    },
+    {
+      "feature": "S_ActualPosition",
+      "error": 0.7040339112281799,
+      "z_score": 0.4383235275745392
+    },
+    {
+      "feature": "S_SetPosition",
+      "error": 0.6500729918479919,
+      "z_score": 0.21181482076644897
+    },
+    {
+      "feature": "S_ActualAcceleration",
+      "error": 0.9401174783706665,
+      "z_score": -0.14223721623420715
+    }
+  ],
+  "guide": {
+    "cause_estimate": "공구가 마모되었거나 손상되었을 가능성이 있습니다.",
+    "confidence_note": "이상 신호가 관측되었으나, 직접적인 공구 상태에 대한 정보가 없으므로 확신할 수 없습니다.",
+    "recommended_actions": [
+      "절삭 속도를 낮추는 것을 고려해보세요.",
+      "이송량을 늘려보는 것을 추천합니다.",
+      "절삭 깊이를 변경해보는 것도 검토해보세요."
+    ],
+    "safety_notes": [
+      "작업 중 머신이 예상치 못한 동작을 할 수 있으므로 주의해야 합니다.",
+      "모든 조치를 취하기 전 머신을 안전하게 정지시키는 것이 중요합니다."
+    ],
+    "sources": [
+      {
+        "title": "KAMP CNC 머신 AI 데이터셋 가이드북",
+        "url": "https://www.kamp-ai.kr/"
+      },
+      {
+        "title": "Sandvik Coromant Milling Troubleshooting",
+        "url": "https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling"
+      }
+    ]
+  },
+  "model_version": "1",
+  "mlflow_run_id": "56635df9337b486999f5ce135e1da466"
+}
