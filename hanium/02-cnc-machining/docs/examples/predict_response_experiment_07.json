@@ -206,26 +206,42 @@
       "z_score": -0.14223721623420715
     }
   ],
+  "fault": {
+    "verdict": "confirmed",
+    "verdict_ko": "확정",
+    "situation": "이송축 과부하",
+    "category": "feed_overload",
+    "coverage": 0.66,
+    "matched_features": [
+      "Y_OutputPower",
+      "X_OutputPower"
+    ],
+    "alternatives": [
+      "절삭 조건 과다",
+      "볼스크류·가이드 윤활 불량"
+    ],
+    "other_group": {
+      "situation": "이송 속도 설정 변경",
+      "category": "general",
+      "coverage": 0.2
+    },
+    "top_z": 35.59379959106445
+  },
   "guide": {
-    "cause_estimate": "공구가 마모되었거나 손상되었을 가능성이 있습니다.",
-    "confidence_note": "이상 신호가 관측되었으나, 직접적인 공구 상태에 대한 정보가 없으므로 확신할 수 없습니다.",
+    "cause_estimate": "이송축의 과부하로 인해 발생한 것으로 보이며, 이는 절삭 조건이 과다하거나 볼스크류·가이드의 윤활 상태가 불량일 가능성이 있습니다.",
+    "confidence_note": "센서 신호가 초과하는 수준에서 이상이 발견되어 이송축 과부하가 확인되었습니다. 하지만 다른 후보들도 함께 확인할 필요가 있습니다.",
     "recommended_actions": [
-      "절삭 속도를 낮추는 것을 고려해보세요.",
-      "이송량을 늘려보는 것을 추천합니다.",
-      "절삭 깊이를 변경해보는 것도 검토해보세요."
+      "절삭 조건을 재검토하고 필요 시 파라미터를 낮추거나 시험 가공으로 확인할 것",
+      "볼스크류 및 가이드의 윤활 상태를 점검하고 필요한 경우 윤활유를 보충할 것"
     ],
     "safety_notes": [
-      "작업 중 머신이 예상치 못한 동작을 할 수 있으므로 주의해야 합니다.",
-      "모든 조치를 취하기 전 머신을 안전하게 정지시키는 것이 중요합니다."
+      "기계 작동 전 반드시 에너지 통제 절차를 준수해야 하며, 작업자는 안전 장비를 착용해야 합니다.",
+      "작업 시작 전 기계의 가공점 방호 수단이 적절히 작동하는지 점검해야 합니다."
     ],
     "sources": [
       {
-        "title": "KAMP CNC 머신 AI 데이터셋 가이드북",
-        "url": "https://www.kamp-ai.kr/"
-      },
-      {
-        "title": "Sandvik Coromant Milling Troubleshooting",
-        "url": "https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling"
+        "title": "팀 시나리오 플레이북(자체 작성)",
+        "url": "rag/sources/scenario_playbook.md"
       }
     ]
   },

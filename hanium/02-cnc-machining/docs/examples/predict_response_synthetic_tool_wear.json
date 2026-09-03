@@ -1,0 +1,256 @@
+{
+  "predicted_label": 1,
+  "predicted_label_text": "bad",
+  "score": 48.163108825683594,
+  "threshold": 0.8566220998764038,
+  "method": "mean",
+  "feature_contributions": [
+    {
+      "feature": "S_OutputCurrent",
+      "error": 1919.681396484375,
+      "z_score": 12418.6962890625
+    },
+    {
+      "feature": "S_CurrentFeedback",
+      "error": 4.474221706390381,
+      "z_score": 83.6115951538086
+    },
+    {
+      "feature": "S_OutputPower",
+      "error": 5.0959672927856445,
+      "z_score": 80.77234649658203
+    },
+    {
+      "feature": "S_SetVelocity",
+      "error": 1.2030218839645386,
+      "z_score": 15.08410358428955
+    },
+    {
+      "feature": "S_DCBusVoltage",
+      "error": 1.124619722366333,
+      "z_score": 14.845434188842773
+    },
+    {
+      "feature": "S_OutputVoltage",
+      "error": 1.07435941696167,
+      "z_score": 13.40417194366455
+    },
+    {
+      "feature": "S_ActualVelocity",
+      "error": 1.0042450428009033,
+      "z_score": 11.79384994506836
+    },
+    {
+      "feature": "X_CurrentFeedback",
+      "error": 1.6070115566253662,
+      "z_score": 9.157407760620117
+    },
+    {
+      "feature": "X_OutputCurrent",
+      "error": 3.7096424102783203,
+      "z_score": 6.6824049949646
+    },
+    {
+      "feature": "Y_CurrentFeedback",
+      "error": 1.4669004678726196,
+      "z_score": 6.403412818908691
+    },
+    {
+      "feature": "X_OutputPower",
+      "error": 3.2772200107574463,
+      "z_score": 5.680069446563721
+    },
+    {
+      "feature": "Y_DCBusVoltage",
+      "error": 1.159483551979065,
+      "z_score": 4.640854358673096
+    },
+    {
+      "feature": "X_DCBusVoltage",
+      "error": 1.1309974193572998,
+      "z_score": 3.6222643852233887
+    },
+    {
+      "feature": "M_CURRENT_FEEDRATE",
+      "error": 0.8113648891448975,
+      "z_score": 3.1898081302642822
+    },
+    {
+      "feature": "Y_OutputPower",
+      "error": 1.316776156425476,
+      "z_score": 2.89778733253479
+    },
+    {
+      "feature": "X_OutputVoltage",
+      "error": 1.5186406373977661,
+      "z_score": 2.573570966720581
+    },
+    {
+      "feature": "Y_OutputCurrent",
+      "error": 1.8518712520599365,
+      "z_score": 2.3998043537139893
+    },
+    {
+      "feature": "Y_OutputVoltage",
+      "error": 1.1247005462646484,
+      "z_score": 2.0055599212646484
+    },
+    {
+      "feature": "Z_ActualAcceleration",
+      "error": 1.840763807296753,
+      "z_score": 1.9940468072891235
+    },
+    {
+      "feature": "Z_SetAcceleration",
+      "error": 1.9430906772613525,
+      "z_score": 1.9163875579833984
+    },
+    {
+      "feature": "Z_SetVelocity",
+      "error": 1.0714070796966553,
+      "z_score": 1.8860845565795898
+    },
+    {
+      "feature": "Z_ActualVelocity",
+      "error": 1.06010901927948,
+      "z_score": 1.8081552982330322
+    },
+    {
+      "feature": "Z_ActualPosition",
+      "error": 0.27323195338249207,
+      "z_score": 1.7339723110198975
+    },
+    {
+      "feature": "X_ActualVelocity",
+      "error": 1.323472499847412,
+      "z_score": 1.7273354530334473
+    },
+    {
+      "feature": "S_SetAcceleration",
+      "error": 1.4465092420578003,
+      "z_score": 1.7018074989318848
+    },
+    {
+      "feature": "X_SetVelocity",
+      "error": 1.299353837966919,
+      "z_score": 1.667093276977539
+    },
+    {
+      "feature": "Z_SetPosition",
+      "error": 0.2647469639778137,
+      "z_score": 1.6174426078796387
+    },
+    {
+      "feature": "Y_SetVelocity",
+      "error": 0.921358048915863,
+      "z_score": 1.1987961530685425
+    },
+    {
+      "feature": "Y_ActualVelocity",
+      "error": 0.910308837890625,
+      "z_score": 1.09527587890625
+    },
+    {
+      "feature": "S_ActualPosition",
+      "error": 0.831157922744751,
+      "z_score": 0.9446112513542175
+    },
+    {
+      "feature": "X_ActualAcceleration",
+      "error": 1.580187439918518,
+      "z_score": 0.9424465298652649
+    },
+    {
+      "feature": "X_SetAcceleration",
+      "error": 2.0472631454467773,
+      "z_score": 0.8899626135826111
+    },
+    {
+      "feature": "S_SetPosition",
+      "error": 0.8130090236663818,
+      "z_score": 0.8597278594970703
+    },
+    {
+      "feature": "S_ActualAcceleration",
+      "error": 1.1121978759765625,
+      "z_score": 0.4692419469356537
+    },
+    {
+      "feature": "Y_SetAcceleration",
+      "error": 1.3481099605560303,
+      "z_score": 0.16969385743141174
+    },
+    {
+      "feature": "Y_ActualAcceleration",
+      "error": 1.003690481185913,
+      "z_score": -0.11218035221099854
+    },
+    {
+      "feature": "X_SetPosition",
+      "error": 0.2065245360136032,
+      "z_score": -0.3440144658088684
+    },
+    {
+      "feature": "Y_ActualPosition",
+      "error": 0.21716448664665222,
+      "z_score": -0.48877742886543274
+    },
+    {
+      "feature": "Y_SetPosition",
+      "error": 0.21553006768226624,
+      "z_score": -0.507988691329956
+    },
+    {
+      "feature": "X_ActualPosition",
+      "error": 0.1902841180562973,
+      "z_score": -0.5298916697502136
+    }
+  ],
+  "fault": {
+    "verdict": "confirmed",
+    "verdict_ko": "확정",
+    "situation": "공구 마모",
+    "category": "tool_wear",
+    "coverage": 0.8,
+    "matched_features": [
+      "S_OutputCurrent",
+      "S_CurrentFeedback",
+      "S_OutputPower"
+    ],
+    "alternatives": [
+      "공구 파손·치핑",
+      "스핀들 베어링 손상"
+    ],
+    "other_group": {
+      "situation": "공구 돌출 과다·홀더 불량",
+      "category": "vibration_backlash",
+      "coverage": 0.22
+    },
+    "top_z": 12418.6962890625
+  },
+  "guide": {
+    "cause_estimate": "공구 마모가 원인일 가능성이 있습니다.",
+    "confidence_note": "센서 서명 일치가 0.80으로 나타나므로, 이러한 판단이 맞을 확률이 높습니다.",
+    "recommended_actions": [
+      "공구의 마모 상태를 확인하고, 필요시 교체합니다.",
+      "절삭 속도를 낮춰 공구 수명을 연장합니다.",
+      "공구 교체 후 스핀들 부하가 기준선으로 돌아오는지 모니터링합니다."
+    ],
+    "safety_notes": [
+      "작업 중에는 기계의 안전 장치가 작동해 있는지 확인해야 합니다.",
+      "정비 작업 시 기계가 에너지원으로부터 안전하게 격리되어야 합니다."
+    ],
+    "sources": [
+      {
+        "title": "팀 시나리오 플레이북(자체 작성)",
+        "url": "rag/sources/scenario_playbook.md"
+      },
+      {
+        "title": "OSHA Machine Guarding & Lockout/Tagout",
+        "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements"
+      }
+    ]
+  },
+  "model_version": "1",
+  "mlflow_run_id": "56635df9337b486999f5ce135e1da466"
+}
