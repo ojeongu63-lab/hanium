@@ -406,3 +406,28 @@ def test_predict_response_includes_versions_object(tmp_path, monkeypatch):
     assert body["versions"] == {
         "playbook": "abcd1234", "corpus": "2026-09-03T12:05+09:00", "chat_model": "gpt-4o-mini",
     }
+
+
+def test_demo_routes_serve_page_and_inputs(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    index = tmp_path / "index.html"
+    index.write_text('<html><script id="demo-data" type="application/json">{}</script></html>')
+    csv = tmp_path / "tool_wear.csv"
+    csv.write_text("a,b\n1,2\n")
+    monkeypatch.setattr(app_module, "DEMO_INDEX", index)
+    monkeypatch.setattr(app_module, "DEMO_INPUTS", {"tool_wear": csv, "missing": tmp_path / "nope.csv"})
+    client = TestClient(app)
+
+    page = client.get("/demo")
+    assert page.status_code == 200
+    assert page.headers["content-type"].startswith("text/html")
+    assert "demo-data" in page.text
+
+    got = client.get("/demo/inputs/tool_wear")
+    assert got.status_code == 200 and got.text.startswith("a,b")
+    assert client.get("/demo/inputs/unknown").status_code == 404
+    assert client.get("/demo/inputs/missing").status_code == 404
+
+    monkeypatch.setattr(app_module, "DEMO_INDEX", tmp_path / "absent.html")
+    assert client.get("/demo").status_code == 404

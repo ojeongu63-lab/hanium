@@ -14,6 +14,7 @@ import mlflow.pytorch
 import pandas as pd
 import torch
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from mlflow.tracking import MlflowClient
 from openai import OpenAI
 
@@ -30,6 +31,15 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = ROOT / "data" / "monitoring" / "requests.db"
 SHADOW_DB = ROOT / "data" / "monitoring" / "shadow.db"
 DRIFT_WINDOW_SIZE = 10
+DEMO_INDEX = ROOT / "demo" / "index.html"
+DATASET_DIR = ROOT / "data" / "dataset" / "CNC 비식별화 원본데이터_1209" / "CNC Virtual Data set _v2"
+DEMO_INPUTS = {
+    "tool_wear": ROOT / "synthetic" / "scenarios" / "tool_wear.csv",
+    "feed_overload": ROOT / "synthetic" / "scenarios" / "feed_overload.csv",
+    "vibration_backlash": ROOT / "synthetic" / "scenarios" / "vibration_backlash.csv",
+    "experiment_07": DATASET_DIR / "experiment_07.csv",
+    "experiment_12": DATASET_DIR / "experiment_12.csv",
+}
 
 
 @dataclass
@@ -250,6 +260,28 @@ def drift_status(state: ModelState = Depends(get_model_state)) -> dict:
     )
     log_drift_metrics(status, state.mlflow_run_id, step=count_requests(DB_PATH))
     return {**status, "checked_at": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/demo")
+def demo_page() -> FileResponse:
+    """미팅 데모 페이지. 모델 로드와 무관하게 열린다 — 페이지가 /health로 실시간 여부를 판단한다."""
+    if not DEMO_INDEX.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="demo/index.html 없음 — `uv run python demo/build_demo.py`를 먼저 실행하세요.",
+        )
+    return FileResponse(DEMO_INDEX, media_type="text/html")
+
+
+@app.get("/demo/inputs/{key}")
+def demo_input(key: str) -> FileResponse:
+    """데모 페이지의 '실시간으로 다시 계산'이 /predict에 올릴 예시 CSV."""
+    path = DEMO_INPUTS.get(key)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"모르는 예시 키 '{key}' — {sorted(DEMO_INPUTS)}")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"입력 파일 없음: {path} (README §1-2 데이터 배치 확인)")
+    return FileResponse(path, media_type="text/csv", filename=path.name)
 
 
 @app.post("/reload-model")

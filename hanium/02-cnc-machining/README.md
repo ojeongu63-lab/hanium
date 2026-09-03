@@ -291,6 +291,30 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
   참고) — 안 그러면 로컬 데이터(수 GB)까지 빌드 컨텍스트로 잡혀 몇 분씩
   걸린다.
 
+### 2-9. 미팅 데모 화면
+
+모델 판정 → 센서 근거 → 플레이북 대조 → 조치 가이드(탭 1)와 시나리오 3종 40일
+타임라인 + 재학습 루프 이벤트(탭 2)를 한 페이지로 보여 준다. 실제 결과가 파일 안에
+내장돼 있어 **서버 없이도 열린다.**
+
+**기록 모드 (pull만 받은 PC):** `demo/index.html`을 브라우저로 연다. 끝.
+
+**실시간 모드 (같은 카드를 실제 `/predict`로 다시 계산):**
+
+1. 회사 PC에서 `data/`를 묶어 옮긴다 — `tar -czf cnc-data.tar.gz --exclude=data/monitoring data`
+   (60MB 안팎). 개인 PC의 `02-cnc-machining/` 바로 아래에 풀어 §1-2 구조가 되게 한다.
+   MLflow가 저장한 절대경로는 첫 실행 때 `src/lstm_ae/tracking.py`가 이 PC 기준으로
+   고치므로 재학습이 필요 없다.
+2. `uv sync`
+3. `.env`에 `OPENAI_API_KEY`(§1-4). 없어도 판정·`fault`는 되고 `guide`만 `null`.
+4. `uv run --env-file .env uvicorn serving.app:app --port 8899` → 브라우저에서
+   `http://127.0.0.1:8899/demo`. 상단 배지가 "실시간 연결됨"이면 예시 재계산과 CSV
+   업로드가 된다. WSL이면 §3 참고.
+5. 미팅 전 점검: 예시 하나를 다시 계산해 가이드가 오는지와 소요 시간(몇 초).
+
+페이지 다시 만들기(재료가 바뀐 경우, 워커 로그가 있는 회사 PC에서):
+`uv run python demo/build_demo.py` → `demo/index.html`을 커밋.
+
 ## 3. WSL에서 Windows 브라우저로 접속이 안 될 때
 
 - 기본은 `http://localhost:<port>` 또는 `http://127.0.0.1:<port>`로 바로 열림
@@ -330,6 +354,7 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 |---|---|---|
 | `scripts/` | 전처리·학습·champion 승격 (주 파이프라인) | `data/` 하위 |
 | `rag/` | RAG 코퍼스 구축 (§2-4) | `data/rag/` (원문은 `rag/sources/*.md`) |
+| `demo/` | 미팅 데모 페이지 생성 (§2-9) | `demo/index.html` (커밋됨) |
 | `loocv/` | 정상 실험 LOOCV 검증 (§2-5) | `loocv/summary.{json,csv}` |
 | `synthetic/` | 데모용 합성 이상 시나리오 생성 (§2-6) | `synthetic/scenarios/*.csv` |
 | `augmentation/` | 희소 샘플 증강 실험 | `augmentation/combined_dataset/` (git 제외) |
