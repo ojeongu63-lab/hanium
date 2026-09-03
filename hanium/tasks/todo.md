@@ -543,3 +543,25 @@ PID 파일(`kill $(cat worker.pid)`)이나 `pgrep -f '[d]rift_worker'` 형태로
 객체(playbook 해시·코퍼스 빌드 시각·chat_model) 추가. `data/rag/corpus_meta.json`을
 빌드 시 기록하고 서버가 읽는다. 테스트 200개, 예시 5개 재생성.
 
+
+## 미팅 데모 화면 (2026-09-03 오후)
+
+스펙 `02-cnc-machining/docs/specs/2026-09-03-cnc-demo-page-design.md`, 계획
+`docs/plans/2026-09-03-cnc-demo-page.md`. 사용자 결정: 하이브리드(기록 모드 기본, 서버가
+응답하면 실시간), 범위는 배치 진단 흐름 + 시나리오 타임라인 + 루프 이벤트, 개인 PC에서
+pull 받아 미팅하되 실시간까지 준비.
+
+- [x] Task 1 채점 기록에 ratio·top 추가, 시나리오별 병합, temperature 70일 재실행
+- [x] Task 2 `src/demo/build.py` 로그 파서·조립·주입 + 테스트 4개
+- [x] Task 3 `demo/template.html` + `demo/build_demo.py` → `demo/index.html`(256KB, 커밋)
+- [x] Task 4 `/demo`, `/demo/inputs/{key}` + README §2-9 + STRUCTURE
+- [x] Task 5 키 없이/있음 서버 검증, 실시간 재계산 8.6초, 스펙 정정, push
+
+### 리뷰
+
+테스트 205개 통과. 기록 모드는 pull 후 `demo/index.html` 더블클릭, 실시간은 회사 PC의
+`data/`(감시 기록 제외 60MB) 옮기기 + `uv sync` + `.env` + 서버 기동. 남은 일: 사용자가
+브라우저에서 두 탭을 눈으로 확인, 개인 PC에서 리허설.
+
+**배운 것**: 서버 기동 줄과 `pkill -f '<패턴>'`을 같은 명령 문자열에 넣으면 패턴이 셸
+자신과 일치해 셸이 죽는다(exit 144). 종료는 PID 파일이나 별도 명령으로 — `tasks/lessons.md`.
