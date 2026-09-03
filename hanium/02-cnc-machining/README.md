@@ -94,8 +94,9 @@ nice -n 19 uv run uvicorn serving.app:app --port 8899
   메시지, 코퍼스 미구축이거나 `OPENAI_API_KEY` 없으면 `null`(아래 2-4 참고)
   + `fault`: 불량 판정일 때 플레이북(`rag/sources/scenario_playbook.md`, 팀 작성
   상황 16개)의 센서 서명과 상위 피처를 대조해 고른 상황(`situation`, `category`)과
-  판정(`verdict`: `confirmed` 확정 / `composite` 복합 징후 / `weak` 약한 신호 /
-  `unknown` 판단 불가, 정상이면 `none`), 근거(`coverage`, `matched_features`,
+  패턴 진단(`verdict`: `confirmed` 높은 패턴 일치 / `composite` 복합 패턴 / `weak` 약한 신호 /
+  `unknown` 일치 패턴 없음, 정상이면 `none` — 한글 `verdict_ko`는 고장 원인의 확정이 아니라
+  패턴 일치 수준을 뜻함), 근거(`coverage`, `matched_features`,
   `alternatives`, `other_group`, `top_z`). 임베딩·LLM 없이 계산하므로 키 없이도 나오고
   같은 입력이면 같은 값. 코퍼스 미구축이면 `null`
   + `versions`: `fault`·`guide`가 어떤 기준으로 만들어졌는지 — `playbook`(플레이북

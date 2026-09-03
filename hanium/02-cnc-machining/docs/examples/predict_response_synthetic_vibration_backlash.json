@@ -208,7 +208,7 @@
   ],
   "fault": {
     "verdict": "confirmed",
-    "verdict_ko": "확정",
+    "verdict_ko": "높은 패턴 일치",
     "situation": "고정구 풀림·채터",
     "category": "vibration_backlash",
     "coverage": 1.0,
@@ -227,20 +227,24 @@
     "top_z": 148.39273071289062
   },
   "guide": {
-    "cause_estimate": "고정구 풀림이나 채터가 원인일 가능성이 있습니다.",
-    "confidence_note": "시스템 판정이 확정된 만큼 이 원인에 대한 신뢰도가 높습니다.",
+    "cause_estimate": "고정구 풀림 또는 채터일 가능성이 있습니다.",
+    "confidence_note": "센서 패턴 일치도가 높습니다; 관련 센서 패턴이 확인되었습니다.",
     "recommended_actions": [
       "고정구와 클램프를 점검하고 재체결합니다.",
-      "공작물 흔들림 및 가공면의 채터 마크를 확인합니다. 단, 이를 위해서는 기계를 정지해야 합니다."
+      "절삭 깊이를 낮추고 differential pitch 커터를 사용합니다."
     ],
     "safety_notes": [
-      "기계 정지 후 안전 점검을 시행하고 고정구 조건을 확인합니다.",
-      "에너지 통제 절차를 준수하여 작업자를 안전하게 보호합니다."
+      "기계 정지 후 점검을 진행해야 합니다.",
+      "에너지 통제 절차를 준수해야 합니다."
     ],
     "sources": [
       {
-        "title": "팀 시나리오 플레이북(자체 작성)",
-        "url": "rag/sources/scenario_playbook.md"
+        "title": "OSHA Machine Guarding & Lockout/Tagout",
+        "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements"
+      },
+      {
+        "title": "Sandvik Coromant Milling Troubleshooting",
+        "url": "https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling"
       }
     ]
   },

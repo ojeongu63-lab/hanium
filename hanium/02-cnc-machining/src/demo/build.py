@@ -2,6 +2,8 @@
 import json
 import re
 
+from rag.playbook import VERDICT_KO
+
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 DAY_LINE = re.compile(r"^Day (\d+)\s+score/threshold=")
 TRIGGER = re.compile(r"^\[Day (\d+)\] 트리거 발동")
@@ -66,7 +68,8 @@ def _batch(row: dict) -> dict:
     fault = row["fault"]
     return {
         "index": row["index"], "ratio": round(row["ratio"], 3), "pred": row["pred"],
-        "verdict": fault["verdict"], "verdict_ko": fault["verdict_ko"],
+        # 한글 문구는 기록 시점이 아니라 현재 VERDICT_KO를 따른다(문구가 바뀌어도 재채점 불필요)
+        "verdict": fault["verdict"], "verdict_ko": VERDICT_KO.get(fault["verdict"], fault["verdict_ko"]),
         "situation": fault["situation"], "coverage": fault["coverage"], "top": row["top"],
     }
 

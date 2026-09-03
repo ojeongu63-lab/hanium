@@ -42,7 +42,7 @@ def _row(day, index, pred, verdict, situation, ratio):
         "day": day, "index": index, "truth": "good" if day < 21 else "bad", "pred": pred, "ratio": ratio,
         "top": [["S_OutputCurrent", 30.0], ["S_OutputPower", 5.0], ["S_CurrentFeedback", 4.0]],
         "fault": {
-            "verdict": verdict, "verdict_ko": {"confirmed": "확정", "none": "이상 없음"}[verdict],
+            "verdict": verdict, "verdict_ko": {"confirmed": "확정(옛 기록)", "none": "이상 없음"}[verdict],
             "situation": situation, "category": "tool_wear" if situation else None,
             "coverage": 0.8 if situation else 0.0, "matched_features": [], "alternatives": [],
             "other_group": None, "top_z": 30.0,
@@ -72,6 +72,8 @@ def test_assemble_groups_days_and_builds_playbook_and_scenarios():
     assert [b["index"] for b in sc["days"][0]["batches"]] == [0, 1]
     assert sc["days"][0]["ratio_mean"] == 1.0 and sc["days"][0]["truth"] == "bad"
     assert sc["days"][0]["batches"][1]["situation"] == "공구 마모"
+    # 채점 기록의 옛 verdict_ko("확정")를 쓰지 않고 현재 VERDICT_KO로 다시 붙인다
+    assert sc["days"][0]["batches"][1]["verdict_ko"] == "높은 패턴 일치"
     assert sc["events"][0]["kind"] == "trigger"
     assert data["examples"][0]["key"] == "tool_wear"
     assert data["versions"]["playbook"] == "abcd1234"

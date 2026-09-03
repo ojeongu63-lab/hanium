@@ -9,9 +9,13 @@ SYSTEM_PROMPT = (
     "당신은 CNC 가공 현장의 이상탐지 결과를 설명하는 어시스턴트입니다.\n"
     "판정은 센서 신호의 통계적 이상만 본 것이므로 원인을 단정하지 말고 "
     "'~일 가능성이 있습니다', '~로 추정됩니다' 같은 확신도를 낮춘 표현을 쓰세요.\n"
-    "시스템 판정과 시스템이 고른 상황을 원인의 중심에 두세요. 참고 문서에 없는 "
+    "센서 패턴 대조 결과와 시스템이 고른 상황을 원인의 중심에 두세요. 참고 문서에 없는 "
     "원인을 덧붙이지 마세요. 같은 구역의 다른 후보는 '함께 확인할 것'으로만 "
-    "언급하세요. 판정이 확정이 아니면 조치보다 확인 절차를 앞세우세요.\n"
+    "언급하세요. 패턴 일치가 높지 않으면 조치보다 확인 절차를 앞세우세요.\n"
+    "'확정', '판정 확정', '원인으로 확인됨'처럼 AI가 고장 원인을 확정한 것으로 읽히는 "
+    "표현은 쓰지 마세요. 대신 '센서 패턴 일치도가 높습니다', '관련 센서 패턴이 "
+    "확인되었습니다'처럼 패턴 일치 수준으로 쓰세요. 일치도는 확률이 아니므로 "
+    "'맞을 확률'로 바꿔 말하지 마세요.\n"
     "아래 JSON 스키마로만 답하세요:\n"
     '{"cause_estimate": str, "confidence_note": str, '
     '"recommended_actions": [str], "safety_notes": [str], '
@@ -33,11 +37,11 @@ CAUSE_SYSTEM_PROMPT = (
 
 
 def describe_fault(fault: dict) -> str:
-    """프롬프트에 넣는 '시스템 판정' 줄. 판정·상황·수치는 서버가 정한 값이다."""
+    """프롬프트에 넣는 '센서 패턴 대조' 줄. 판정·상황·수치는 서버가 정한 값이다."""
     verdict = fault["verdict"]
     if verdict == "confirmed":
         line = (
-            f"시스템 판정: 확정 — {fault['situation']} (센서 서명 일치 {fault['coverage']:.2f}, "
+            f"센서 패턴 대조: 높은 패턴 일치 — {fault['situation']} (일치도 {fault['coverage']:.2f}, "
             f"일치 센서: {', '.join(fault['matched_features'])})"
         )
         if fault["alternatives"]:
@@ -46,16 +50,16 @@ def describe_fault(fault: dict) -> str:
     if verdict == "composite":
         other = fault["other_group"]
         return (
-            f"시스템 판정: 복합 징후 — {fault['situation']}({fault['coverage']:.2f})와 "
+            f"센서 패턴 대조: 복합 패턴 — {fault['situation']}({fault['coverage']:.2f})와 "
             f"{other['situation']}({other['coverage']:.2f})가 함께 나타남. 여러 센서가 같이 "
             "이동하는 드리프트일 수 있음. 라벨·추이 확인을 권할 것."
         )
     if verdict == "weak":
         return (
-            f"시스템 판정: 약한 신호 — 상위 센서 z {fault['top_z']:.1f} (기준 {WEAK_Z:g} 미만). "
+            f"센서 패턴 대조: 약한 신호 — 상위 센서 z {fault['top_z']:.1f} (기준 {WEAK_Z:g} 미만). "
             f"보류·재확인을 권할 것. 참고 상황: {fault['situation']}"
         )
-    return "시스템 판정: 판단 불가 — 서명이 일치하는 상황 없음. 현장 확인을 권할 것."
+    return "센서 패턴 대조: 일치 패턴 없음 — 서명이 일치하는 상황 없음. 현장 확인을 권할 것."
 
 
 def _build_user_prompt(predict_result: dict, retrieved_chunks: list[dict], fault: dict | None = None) -> str:

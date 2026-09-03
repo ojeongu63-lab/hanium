@@ -208,7 +208,7 @@
   ],
   "fault": {
     "verdict": "confirmed",
-    "verdict_ko": "확정",
+    "verdict_ko": "높은 패턴 일치",
     "situation": "이송축 과부하",
     "category": "feed_overload",
     "coverage": 0.66,
@@ -228,16 +228,16 @@
     "top_z": 35.59379959106445
   },
   "guide": {
-    "cause_estimate": "이송축 과부하로 인해 센서 신호가 이상을 보였을 가능성이 있습니다.",
-    "confidence_note": "현재 판정은 확정되어 있으며, 관련 센서 신호가 일치하고 있습니다. 그러나 다른 후보인 절삭 조건 과다, 볼스크류·가이드 윤활 불량도 함께 확인할 필요가 있습니다.",
+    "cause_estimate": "이송축 과부하로 추정됩니다. 관련 센서 패턴이 확인되었습니다.",
+    "confidence_note": "패턴 일치도가 높습니다.",
     "recommended_actions": [
-      "절삭 조건을 재검토하고 파라미터를 낮춰 시험 가공으로 확인합니다.",
-      "칩 배출 상태 및 윤활 상태를 점검합니다.",
-      "서보 알람 이력을 확인합니다."
+      "증상에 따라 절삭 조건을 검토하고 조정할 것",
+      "이송량(fz)과 절삭 깊이(ap)를 줄일 것",
+      "칩 배출 상태를 점검하고 개선할 것"
     ],
     "safety_notes": [
-      "작업자는 기계의 정비를 진행하기 전에 안전 절차를 준수하여야 합니다.",
-      "모든 위험 에너지가 격리된 상태에서 작업을 해야 합니다."
+      "가공 중 작업자의 안전을 위해 필요한 방호 조치를 마련할 것",
+      "정비 작업 시 에너지 통제 절차를 준수할 것"
     ],
     "sources": [
       {
@@ -247,10 +247,6 @@
       {
         "title": "Sandvik Coromant Milling Troubleshooting",
         "url": "https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling"
-      },
-      {
-        "title": "OSHA Machine Guarding & Lockout/Tagout",
-        "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements"
       }
     ]
   },

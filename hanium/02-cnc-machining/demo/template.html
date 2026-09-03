@@ -100,8 +100,8 @@
     <div class="scenario-buttons" id="scenario-buttons"></div>
     <p id="scenario-label"></p>
     <div class="legend">
-      <span style="--c:#1e56a0">일 평균 배율</span><span style="--c:#c62828">확정</span><span style="--c:#ef6c00">복합 징후</span>
-      <span style="--c:#f9a825">약한 신호</span><span style="--c:#757575">판단 불가</span><span style="--c:#9ccc9c">정상 판정 배치</span><span style="--c:#fdecea">실제 불량 구간</span>
+      <span style="--c:#1e56a0">일 평균 배율</span><span style="--c:#c62828">높은 패턴 일치</span><span style="--c:#ef6c00">복합 패턴</span>
+      <span style="--c:#f9a825">약한 신호</span><span style="--c:#757575">일치 패턴 없음</span><span style="--c:#9ccc9c">정상 판정 배치</span><span style="--c:#fdecea">실제 불량 구간</span>
       <span>▲ 트리거 · ✕ 거부 · ◆ 섀도우 시작 · ◇ 섀도우 종료 · ★ 승격</span>
     </div>
     <div id="chart"></div>
@@ -207,7 +207,7 @@
     } else {
       cards.push(`<div class="card"><h3>3. 플레이북 대조</h3><p class="meta">${fault ? '정상 판정이라 대조하지 않습니다.' : '코퍼스 미로드 — fault 없음'}</p></div>`);
     }
-    cards.push(`<div class="card"><h3>4. 판정</h3>
+    cards.push(`<div class="card"><h3>4. 센서 패턴 진단 <span class="meta">패턴 일치 수준 — 고장 원인의 확정이 아님</span></h3>
       <p>${fault ? `<span class="pill ${fault.verdict}">${esc(fault.verdict_ko)}</span> &nbsp; ${fault.situation ? `<b>${esc(fault.situation)}</b> (${esc(fault.category || '')})` : ''}` : '<span class="pill unknown">fault 없음</span>'}</p>
       <p class="reason">${esc(reasonText(fault))}</p></div>`);
     const docs = chunkNames(fault);
@@ -319,7 +319,7 @@
       });
       b += `<rect class="hit" data-day="${d.day}" x="${x(d.day) - cw / 2}" y="0" width="${cw}" height="${BH}" fill="transparent" style="cursor:pointer"/>`;
     });
-    b += `<text x="${L}" y="${BH - 3}" font-size="10" fill="#888">일별 불량 판정 배치 수(최대 5)와 판정 종류</text></svg>`;
+    b += `<text x="${L}" y="${BH - 3}" font-size="10" fill="#888">일별 불량 판정 배치 수(최대 5)와 패턴 진단 종류</text></svg>`;
     $('#band').innerHTML = b;
     document.querySelectorAll('#chart rect.hit, #band rect.hit').forEach((r) => r.addEventListener('click', () => renderDay(name, Number(r.dataset.day))));
     $('#day-detail').innerHTML = '<p class="note">그래프나 띠에서 날짜를 클릭하면 그날 배치 5개와 이벤트가 나옵니다.</p>';
@@ -328,7 +328,7 @@
     state.day = day;
     const sc = DATA.scenarios[name], d = sc.days.find((x) => x.day === day), evs = sc.events.filter((e) => e.day === day);
     let h = `<div class="card"><h3>Day ${day} <span class="meta">실제 라벨 ${d.truth === 'bad' ? '불량' : '정상'} · 평균 배율 ${d.ratio_mean.toFixed(2)}</span></h3>
-      <table><thead><tr><th>배치</th><th>배율</th><th>판정</th><th>진단</th><th>상황</th><th>일치</th><th>상위 센서</th></tr></thead><tbody>`;
+      <table><thead><tr><th>배치</th><th>배율</th><th>판정</th><th>패턴 진단</th><th>상황</th><th>일치</th><th>상위 센서</th></tr></thead><tbody>`;
     d.batches.forEach((b) => {
       h += `<tr><td>day${String(day).padStart(2, '0')}_${b.index}</td><td class="num">${b.ratio.toFixed(2)}</td><td><span class="pill ${b.pred === 'bad' ? 'bad' : 'good'}">${b.pred === 'bad' ? '불량' : '정상'}</span></td>
         <td>${b.pred === 'bad' ? `<span class="pill ${b.verdict}">${esc(b.verdict_ko)}</span>` : '-'}</td><td>${esc(b.situation || '-')}</td><td class="num">${b.pred === 'bad' ? b.coverage.toFixed(2) : '-'}</td>

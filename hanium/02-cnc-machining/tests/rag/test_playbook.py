@@ -114,7 +114,7 @@ def test_match_confirmed_picks_best_signature_and_lists_alternatives():
     result = match_playbook(_contribs("S_OutputCurrent", "S_CurrentFeedback", "S_OutputPower"), _RULE_CORPUS)
 
     assert result["verdict"] == "confirmed"
-    assert result["verdict_ko"] == "확정"
+    assert result["verdict_ko"] == "높은 패턴 일치"
     assert result["situation"] == "공구 마모"
     assert result["category"] == "tool_wear"
     assert result["coverage"] == pytest.approx(1.0)

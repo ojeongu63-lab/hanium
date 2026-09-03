@@ -208,7 +208,7 @@
   ],
   "fault": {
     "verdict": "confirmed",
-    "verdict_ko": "확정",
+    "verdict_ko": "높은 패턴 일치",
     "situation": "이송축 과부하",
     "category": "feed_overload",
     "coverage": 0.66,
@@ -228,21 +228,29 @@
     "top_z": 106.99539184570312
   },
   "guide": {
-    "cause_estimate": "이송축 과부하로 인해 X축과 Y축의 출력 전류가 상승했을 가능성이 있습니다. 이로 인해 시스템 판정이 'bad'로 나타났습니다.",
-    "confidence_note": "확정 판정이므로 해당 원인에 대한 신뢰도가 높습니다.",
+    "cause_estimate": "센서 패턴 일치도가 높습니다. 이송축 과부하로 추정됩니다.",
+    "confidence_note": "상위 이상 피처에서 X_OutputCurrent와 Y_OutputCurrent가 정상 대비 크게 상승한 것으로 미루어 볼 때, 과부하 상태일 가능성이 있습니다.",
     "recommended_actions": [
-      "이송량(fz)과 절삭 깊이(ap)를 줄이고, 깊은 절삭은 여러 패스로 나눕니다.",
-      "절삭유 및 압축 공기로 칩 배출을 개선합니다.",
-      "서보 알람 이력을 확인하여 추가적인 문제 유무를 점검합니다."
+      "현장 확인: 볼스크류·가이드 윤활 상태 및 절삭 조건 점검",
+      "이송량(fz)과 절삭 깊이(ap)를 줄이고 깊은 절삭은 여러 패스로 나누기",
+      "절삭유·압축 공기로 칩 배출 개선"
     ],
     "safety_notes": [
-      "작업자는 기계 작동 중 안전을 위해 필요한 방호수를 착용해야 합니다.",
-      "정비 또는 보수 작업 전에 기계를 작동 불가능한 상태로 만들어야 합니다."
+      "가공점 방호 수단을 제공해야 합니다.",
+      "작업자가 기계나 설비에 대해 정비 또는 보수 작업을 하기 전에 에너지 통제 절차를 따라야 합니다."
     ],
     "sources": [
       {
-        "title": "팀 시나리오 플레이북(자체 작성)",
+        "title": "팀 시나리오 플레이북",
         "url": "rag/sources/scenario_playbook.md"
+      },
+      {
+        "title": "OSHA Machine Guarding & Lockout/Tagout",
+        "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements"
+      },
+      {
+        "title": "Sandvik Coromant Milling Troubleshooting",
+        "url": "https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling"
       }
     ]
   },
