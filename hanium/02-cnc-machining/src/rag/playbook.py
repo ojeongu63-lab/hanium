@@ -75,3 +75,80 @@ def parse_playbook(text: str, known_features: set[str] | None = None) -> list[di
             body.append(stripped)
     flush()
     return chunks
+
+
+TOP_N = 5              # 대조에 쓰는 상위 피처 수
+WEAK_Z = 10.0          # 상위 1 피처의 z가 이 미만이면 "약한 신호"
+COMPOSITE_RATIO = 0.5  # 다른 그룹 최고 점수가 1위의 이 비율 이상이면 "복합 징후"
+
+VERDICT_KO = {
+    "confirmed": "확정",
+    "composite": "복합 징후",
+    "weak": "약한 신호",
+    "unknown": "판단 불가",
+    "none": "이상 없음",
+}
+
+NO_FAULT = {
+    "verdict": "none", "verdict_ko": VERDICT_KO["none"],
+    "situation": None, "category": None, "coverage": 0.0,
+    "matched_features": [], "alternatives": [], "other_group": None, "top_z": None,
+}
+
+
+def coverage(signature: list[str], contributions: list[dict], top_n: int = TOP_N) -> float:
+    """상위 top_n 피처를 1/순위로 가중해, 서명이 설명하는 비율(0~1). 소수 둘째 자리."""
+    top = contributions[:top_n]
+    if not top:
+        return 0.0
+    total = sum(1 / (rank + 1) for rank in range(len(top)))
+    got = sum(1 / (rank + 1) for rank, c in enumerate(top) if c["feature"] in signature)
+    return round(got / total, 2)
+
+
+def match_playbook(contributions: list[dict], corpus: list[dict]) -> dict | None:
+    """플레이북 항목 중 상위 피처를 가장 잘 설명하는 상황을 고르고 세 단계로 판정한다.
+    동점이면 코퍼스 순서(구역 대표 우선). 플레이북 항목이 없으면 None."""
+    entries = [c for c in corpus if c.get("source") == PLAYBOOK_SOURCE]
+    if not entries:
+        return None
+
+    scored = [(coverage(entry["signature"], contributions), entry) for entry in entries]
+    best_cov, best = max(scored, key=lambda pair: pair[0])   # max는 첫 최댓값을 돌려준다
+    top_z = float(contributions[0]["z_score"]) if contributions else None
+
+    if best_cov == 0.0:
+        return {
+            **NO_FAULT, "verdict": "unknown", "verdict_ko": VERDICT_KO["unknown"], "top_z": top_z,
+        }
+
+    others = [(cov, e) for cov, e in scored if e["fault_category"] != best["fault_category"]]
+    other_cov, other = max(others, key=lambda pair: pair[0]) if others else (0.0, None)
+    same = sorted(
+        ((cov, e) for cov, e in scored if e["fault_category"] == best["fault_category"] and e is not best),
+        key=lambda pair: -pair[0],
+    )
+
+    if top_z is not None and top_z < WEAK_Z:
+        verdict = "weak"
+    elif other is not None and other_cov >= COMPOSITE_RATIO * best_cov:
+        verdict = "composite"
+    else:
+        verdict = "confirmed"
+
+    return {
+        "verdict": verdict,
+        "verdict_ko": VERDICT_KO[verdict],
+        "situation": best["name"],
+        "category": best["fault_category"],
+        "coverage": best_cov,
+        "matched_features": [
+            c["feature"] for c in contributions[:TOP_N] if c["feature"] in best["signature"]
+        ],
+        "alternatives": [e["name"] for _, e in same[:2]],
+        "other_group": (
+            {"situation": other["name"], "category": other["fault_category"], "coverage": other_cov}
+            if other is not None and other_cov > 0.0 else None
+        ),
+        "top_z": top_z,
+    }
