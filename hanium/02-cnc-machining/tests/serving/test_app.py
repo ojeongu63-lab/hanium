@@ -152,6 +152,29 @@ def test_predict_response_includes_guide_field(tmp_path, monkeypatch):
         assert body["guide"] is None  # _fake_state는 rag_corpus 등을 안 채움
 
 
+def test_predict_response_includes_fault_field(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    response = client.post(
+        "/predict",
+        files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    )
+
+    body = response.json()
+    assert "fault" in body
+    if body["predicted_label_text"] == "good":
+        assert body["fault"]["verdict"] == "none"
+    else:
+        assert body["fault"] is None  # _fake_state는 rag_corpus를 안 채움
+    assert {"predicted_label", "predicted_label_text", "score", "threshold", "method",
+            "feature_contributions", "model_version", "mlflow_run_id", "guide"} <= set(body)
+
+
 def test_predict_logs_request_for_drift_monitoring(tmp_path, monkeypatch):
     import serving.app as app_module
 

@@ -96,7 +96,7 @@ def test_predict_experiment_returns_expected_shape():
 
     assert set(result.keys()) == {
         "predicted_label", "predicted_label_text", "score", "threshold", "method",
-        "feature_contributions", "guide",
+        "feature_contributions", "fault", "guide",
     }
     assert result["predicted_label"] in (0, 1)
     assert result["predicted_label_text"] in ("good", "bad")
@@ -176,3 +176,46 @@ def test_predict_experiment_forwards_rag_state_for_bad_prediction():
 
     assert result["predicted_label_text"] == "bad"
     assert result["guide"] is None  # rag_corpus 등이 없으니 None
+
+
+_PLAYBOOK_CORPUS = [
+    {"name": "f0 상황", "heading": "f0 상황 — x", "text": "관련 센서: f0", "fault_category": "tool_wear",
+     "content_type": "cause", "source": "playbook", "signature": ["f0", "f1", "f2"],
+     "title": "팀 시나리오 플레이북(자체 작성)", "url": "rag/sources/scenario_playbook.md"},
+]
+
+
+def _predict(df, threshold, rag_corpus=None):
+    np.random.seed(0)
+    torch.manual_seed(0)
+    model = LSTMAutoencoder(num_features=3, hidden_size=4, latent_dim=2)
+    return predict_experiment(
+        df=df, model=model, feature_columns=FEATURE_COLUMNS, scaler_dict=_scaler_dict(),
+        window_size=6, threshold=threshold, method="mean", feature_baseline=_feature_baseline(),
+        rag_corpus=rag_corpus,
+    )
+
+
+def test_predict_experiment_good_returns_no_fault():
+    result = _predict(_raw_df(20), threshold=1e9)
+
+    assert result["predicted_label_text"] == "good"
+    assert result["fault"]["verdict"] == "none"
+    assert result["fault"]["verdict_ko"] == "이상 없음"
+
+
+def test_predict_experiment_bad_without_corpus_has_null_fault():
+    result = _predict(_raw_df(20), threshold=-1.0)
+
+    assert result["predicted_label_text"] == "bad"
+    assert result["fault"] is None
+    assert result["guide"] is None
+
+
+def test_predict_experiment_bad_with_playbook_corpus_matches_situation():
+    result = _predict(_raw_df(20), threshold=-1.0, rag_corpus=_PLAYBOOK_CORPUS)
+
+    assert result["fault"]["situation"] == "f0 상황"
+    assert result["fault"]["verdict"] in {"confirmed", "weak"}   # z 크기는 난수에 달림
+    assert result["fault"]["coverage"] == 1.0
+    assert result["guide"] is None                                # 인덱스·클라이언트 없음

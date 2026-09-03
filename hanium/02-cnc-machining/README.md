@@ -92,6 +92,12 @@ nice -n 19 uv run uvicorn serving.app:app --port 8899
   + `guide`: 불량 판정일 때 RAG(코퍼스 검색 + OpenAI 생성)로 만든 현장 조치
   가이드(원인 추정/확신도 설명/권장 조치/안전수칙/출처). 정상 판정이면 고정
   메시지, 코퍼스 미구축이거나 `OPENAI_API_KEY` 없으면 `null`(아래 2-4 참고)
+  + `fault`: 불량 판정일 때 플레이북(`rag/sources/scenario_playbook.md`, 팀 작성
+  상황 16개)의 센서 서명과 상위 피처를 대조해 고른 상황(`situation`, `category`)과
+  판정(`verdict`: `confirmed` 확정 / `composite` 복합 징후 / `weak` 약한 신호 /
+  `unknown` 판단 불가, 정상이면 `none`), 근거(`coverage`, `matched_features`,
+  `alternatives`, `other_group`, `top_z`). 임베딩·LLM 없이 계산하므로 키 없이도 나오고
+  같은 입력이면 같은 값. 코퍼스 미구축이면 `null`
 - `/drift-status`, `/reload-model`, `/start-shadow`, `/stop-shadow`: 자동 재학습
   루프용(§2-7). 감시 워커가 호출하며 사람이 직접 쓸 일은 거의 없음
 
@@ -142,11 +148,14 @@ uv run python scripts/promote_model.py <등록된 버전 번호>  # 그 버전�
 
 ### 2-4. RAG 코퍼스 구축 (최초 1회, OpenAI API 키 필요)
 
-`/predict`의 `guide` 필드가 검색할 지식 코퍼스를 만드는 스크립트. 실제 공개
+`/predict`의 `guide`·`fault` 필드가 쓸 지식 코퍼스를 만드는 스크립트. 실제 공개
 문서(Sandvik Coromant 밀링 트러블슈팅, OSHA 기계 안전수칙, KAMP 데이터셋
 가이드북 발췌 — 한국어로 번역·정리한 원문이 `rag/sources/*.md`에 이미 로컬로
-저장돼 있어 웹 접근 불필요)를 청크로 쪼개
-OpenAI 임베딩으로 변환하고 FAISS 인덱스로 저장함:
+저장돼 있어 웹 접근 불필요)와 팀이 시나리오에 맞춰 직접 쓴 상황 플레이북
+`rag/sources/scenario_playbook.md`(외부 자료 아님 — 출처에 "자체 작성"으로
+표시됨. 항목마다 `관련 센서:` 줄의 피처 코드가 `fault` 판정의 근거이며, 빌드 시
+코드가 `FEATURE_COLUMNS`에 있는지 검증)를 청크로 쪼개 OpenAI 임베딩으로
+변환하고 FAISS 인덱스로 저장함(42청크):
 
 ```bash
 cd 02-cnc-machining
@@ -155,7 +164,8 @@ uv run --env-file .env python rag/build_corpus.py
 
 `data/rag/corpus.json`, `data/rag/corpus.index`가 생성됨(`data/` 하위라 git엔
 안 올라감 — 서버 기동 전에 다른 PC에서도 한 번 돌려야 함). 코퍼스 소스
-문서(`rag/sources/*.md`)를 바꾸지 않는 한 다시 돌릴 필요 없음.
+문서(`rag/sources/*.md`)를 바꾸지 않는 한 다시 돌릴 필요 없음(플레이북 항목을
+더하거나 고치면 다시 돌린다).
 
 ### 2-5. LOOCV 검증 (참고용, 진단 스크립트)
 

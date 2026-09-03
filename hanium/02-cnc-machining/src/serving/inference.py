@@ -6,6 +6,7 @@ from lstm_ae.pipeline import compute_feature_errors, compute_window_errors
 from lstm_ae.scoring import aggregate_window_errors_by_experiment
 from lstm_ae.sequencing import make_eval_windows
 from rag.guide import build_guide
+from rag.playbook import NO_FAULT, match_playbook
 
 DEMO_EXPERIMENT_ID = 0
 
@@ -91,12 +92,20 @@ def predict_experiment(
         feature_errors, feature_columns, feature_baseline, exclude_from_ranking
     )
 
+    if predicted_label_text == "good":
+        fault = dict(NO_FAULT)
+    elif rag_corpus:
+        fault = match_playbook(feature_contributions, rag_corpus)
+    else:
+        fault = None
+
     guide = build_guide(
         {
             "predicted_label_text": predicted_label_text,
             "score": score,
             "threshold": threshold,
             "feature_contributions": feature_contributions,
+            "fault": fault,
         },
         rag_corpus,
         rag_index,
@@ -110,5 +119,6 @@ def predict_experiment(
         "threshold": threshold,
         "method": method,
         "feature_contributions": feature_contributions,
+        "fault": fault,
         "guide": guide,
     }
