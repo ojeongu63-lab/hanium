@@ -357,3 +357,43 @@ def build_guide(predict_result, rag_corpus, rag_index, openai_client) -> dict | 
 변경하지 않는 것: `src/retraining/*`, `monitoring/*`, `src/monitoring/*`,
 `src/lstm_ae/*`, `src/preprocessing/*`, `src/rag/{query,retrieval,features}.py`,
 `generate_cause_guide`.
+
+## 실행 결과에 따른 정정 (2026-09-03, 구현 후)
+
+`rag/eval_playbook.py` 결과(`data/rag/eval_playbook.json`, champion v1, 임베딩·LLM
+없음). 기록 4건: 합성 tool_wear → 확정 공구 마모(0.80), 합성 feed_overload →
+확정 이송축 과부하(0.66), 합성 vibration_backlash → 확정 고정구 풀림·채터(1.00),
+실제 experiment_07 → 확정 이송축 과부하(0.66).
+
+| 시나리오 | 구간 | 불량 판정 | 확정 | 복합 징후 | 약한 신호 | 확정 상황 |
+|---|---|---|---|---|---|---|
+| tool_wear | Day 11-20 | 11/50 | 6 | 3 | 2 | 공구 마모 6 |
+| tool_wear | Day 21-40 (실제 불량) | 93/100 | 93 | 0 | 0 | 공구 마모 93 |
+| fixture_loosening | Day 11-20 | 9/50 | 6 | 0 | 3 | 고정구 풀림·채터 6 |
+| fixture_loosening | Day 21-40 (실제 불량) | 77/100 | 77 | 0 | 0 | 고정구 풀림·채터 77 |
+| temperature | Day 11-20 | 6/50 | 0 | 0 | 6 | - |
+| temperature | Day 21-40 (실제 정상) | 79/100 | 10 | 62 | 7 | 이송축 과부하 10 |
+| 셋 공통 | Day 1-10 (변형 전) | 6/50 | 0 | 0 | 6 | - |
+
+배경 절의 실험 표와 다른 점: tool_wear Day 11-20의 확정 1건이 실험에서는 스핀들
+베어링 손상이었는데 공구 마모로 바뀌었다. 서명을 `관련 센서` 줄에 명시하면서
+베어링 항목의 서명이 S_ActualVelocity·S_ActualAcceleration 중심으로 좁아진 결과다.
+그 외 숫자는 모두 같다.
+
+### 라이브 `/predict` (키 있음, `docs/examples/predict_response_*.json`)
+
+| 입력 | 판정 | verdict | situation (일치) | cause_estimate 요지 | 출처 |
+|---|---|---|---|---|---|
+| synthetic tool_wear | bad | confirmed | 공구 마모 (0.80) | 공구 마모가 원인일 가능성 | 플레이북, OSHA |
+| synthetic feed_overload | bad | confirmed | 이송축 과부하 (0.66) | 이송축 과부하로 X·Y축 출력 전류 상승 가능성. 윤활 불량·절삭 조건 과다는 함께 확인 | 플레이북, Sandvik, OSHA |
+| synthetic vibration_backlash | bad | confirmed | 고정구 풀림·채터 (1.00) | 고정구 풀림이나 채터로 추정 | 플레이북, Sandvik, OSHA |
+| experiment_07 | bad | confirmed | 이송축 과부하 (0.66) | 이송축 과부하. 절삭 조건 과다·윤활 불량 가능성 병기 | 플레이북 |
+| experiment_12 | good | none | - | 이상 없음 | - |
+
+원인 문장에 다른 구역의 상황이 섞인 경우는 없다. 서버 로그에 `RAG 가이드 생성
+실패` 0건. 키 없이 띄운 서버에서 같은 tool_wear 요청 → `fault`는 확정 공구
+마모(0.80) 그대로, `guide`는 `null`.
+
+관찰: tool_wear 가이드의 `confidence_note`가 서명 일치 0.80을 "맞을 확률이 높다"로
+읽었다. 일치도는 확률이 아니므로 프롬프트에 그 구분을 한 줄 더하는 것이 다음
+개선 후보다(이번 범위 밖).
