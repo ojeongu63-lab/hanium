@@ -5,6 +5,8 @@
 결과는 data/rag/eval_playbook.json 과 표준 출력. 서버·DB는 건드리지 않는다.
 
   nice -n 19 uv run python rag/eval_playbook.py [--scenarios temperature tool_wear] [--days 40]
+
+여러 번 실행하면 --scenarios 로 지정한 시나리오만 갱신되고 나머지는 유지된다.
 """
 import argparse
 import json
@@ -70,6 +72,8 @@ def score_timeline(corpus: list[dict], state, scenarios: list[str], days: int) -
                 rows.append({
                     "day": day, "index": index, "truth": true_label(scenario, day),
                     "pred": result["predicted_label_text"], "fault": result["fault"],
+                    "ratio": round(result["score"] / result["threshold"], 4),
+                    "top": [[c["feature"], round(c["z_score"], 1)] for c in result["feature_contributions"][:3]],
                 })
         print(f"\n### {scenario} (champion v{state.model_version})")
         summary = {}
@@ -104,8 +108,10 @@ def main() -> None:
     print("\n## 타임라인")
     timeline = score_timeline(corpus, load_champion(), args.scenarios, args.days)
 
-    OUT_PATH.write_text(json.dumps({"recorded": recorded, "timeline": timeline}, ensure_ascii=False, indent=1))
-    print(f"\n저장: {OUT_PATH}")
+    existing = json.loads(OUT_PATH.read_text()) if OUT_PATH.exists() else {}
+    merged = {**existing.get("timeline", {}), **timeline}
+    OUT_PATH.write_text(json.dumps({"recorded": recorded, "timeline": merged}, ensure_ascii=False, indent=1))
+    print(f"\n저장: {OUT_PATH} (시나리오 {sorted(merged)})")
 
 
 if __name__ == "__main__":
