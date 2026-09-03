@@ -508,14 +508,34 @@ PID 파일(`kill $(cat worker.pid)`)이나 `pgrep -f '[d]rift_worker'` 형태로
 스펙 `02-cnc-machining/docs/specs/2026-09-03-cnc-playbook-guide-design.md`,
 계획 `02-cnc-machining/docs/plans/2026-09-03-cnc-playbook-guide.md`.
 
-- [ ] Task 1 플레이북 문서 16항목 + `parse_playbook`
-- [ ] Task 2 `coverage`·`match_playbook`·세 단계 판정 (기록 4건 4/4)
-- [ ] Task 3 `build_corpus.py`에 플레이북 포함, 코퍼스 재빌드(42청크)
-- [ ] Task 4 프롬프트 — 시스템 판정 줄, 공구 마모 유도 문장 제거
-- [ ] Task 5 판정별 청크 선택 `select_chunks`, `build_guide` 새 경로
-- [ ] Task 6 `/predict` 응답 `fault` 필드, README·STRUCTURE
-- [ ] Task 7 `rag/eval_playbook.py` 오프라인 채점 → 스펙 정정 절
-- [ ] Task 8 라이브 검증 5건 → `docs/examples/`, 키 없이 폴백 확인, push
+- [x] Task 1 플레이북 문서 16항목 + `parse_playbook`
+- [x] Task 2 `coverage`·`match_playbook`·세 단계 판정 (기록 4건 4/4)
+- [x] Task 3 `build_corpus.py`에 플레이북 포함, 코퍼스 재빌드(42청크)
+- [x] Task 4 프롬프트 — 시스템 판정 줄, 공구 마모 유도 문장 제거
+- [x] Task 5 판정별 청크 선택 `select_chunks`, `build_guide` 새 경로
+- [x] Task 6 `/predict` 응답 `fault` 필드, README·STRUCTURE
+- [x] Task 7 `rag/eval_playbook.py` 오프라인 채점 → 스펙 정정 절
+- [x] Task 8 라이브 검증 5건 → `docs/examples/`, 키 없이 폴백 확인, push
 
 미결: 플레이북 16항목 내용의 도메인 검토(팀·멘토). 팀원 Spring 쪽에 `fault`
 필드 추가를 알릴 것(기존 9개 키·`guide` 스키마는 불변).
+
+### 리뷰 — 플레이북 가이드 구현 (2026-09-03)
+
+커밋 713569b → 3c75d9f(8개, push 완료). 테스트 169 → 198개 통과. 코퍼스 42청크.
+
+| 검증 | 결과 |
+|---|---|
+| 기록 4건(합성 3 + experiment_07) | 4/4 확정, 기대한 상황 |
+| 타임라인 tool_wear Day 21-40 | 93/93 확정 공구 마모 |
+| 타임라인 fixture_loosening Day 21-40 | 77/77 확정 고정구 풀림·채터 |
+| 타임라인 temperature Day 21-40 (정상) | 복합 징후 62, 약한 신호 7, 확정 10 |
+| 변형 전 오탐 6건 | 전부 약한 신호 |
+| 라이브 /predict 5건 | 확정 4건 상황 일치, 원인 문장에 다른 구역 섞임 없음, 정상 1건 none |
+| 키 없이 | `fault` 그대로, `guide` null |
+
+상세는 스펙 "실행 결과에 따른 정정" 절. 배운 것: Python 3.14 `json.tool`은 파일로
+리다이렉트해도 색상 코드를 넣는다(`NO_COLOR=1` 또는 json.dump로 저장). 전체
+테스트가 cwd에 `mlflow.db`(790KB)를 만들어 놓는다 — 기존 현상, 지웠음. 다음 개선
+후보: 가이드 `confidence_note`가 서명 일치도를 확률로 읽는 문구(프롬프트 한 줄).
+
