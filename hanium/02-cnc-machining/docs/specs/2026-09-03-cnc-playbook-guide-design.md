@@ -380,6 +380,15 @@ def build_guide(predict_result, rag_corpus, rag_index, openai_client) -> dict | 
 베어링 항목의 서명이 S_ActualVelocity·S_ActualAcceleration 중심으로 좁아진 결과다.
 그 외 숫자는 모두 같다.
 
+온도 시나리오에서 "확정 이송축 과부하"로 나간 10건은 **전부 원본 실험 2(이송
+속도 20)에서 만든 배치**다. 이 실험은 변형 전 구간에서도 매번 오탐(z 4.4, 약한
+신호)이 나는, 이전에 기록한 모델의 알려진 사각지대다. 온도 변형이 더해지면 X·Y축
+출력 전류만 상위에 남고 스핀들 신호가 5위 밖으로 밀려 다른 그룹 점수가
+0.15~0.20으로 떨어지므로 배치 하나로는 이송축 과부하와 구분되지 않는다. 나머지
+원본 실험 7개에서 온 배치는 모두 복합 징후였다. 이 10건을 잡으려고
+`COMPOSITE_RATIO`를 0.2 아래로 내리면 실제 고장(다른 그룹 최대 0.33)까지 복합
+징후로 바뀌므로 기준값은 손대지 않는다.
+
 ### 라이브 `/predict` (키 있음, `docs/examples/predict_response_*.json`)
 
 | 입력 | 판정 | verdict | situation (일치) | cause_estimate 요지 | 출처 |
