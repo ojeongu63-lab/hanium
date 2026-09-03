@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNC 이상탐지 · 조치 가이드 데모</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --line:#dfe3e8; --text:#1f2430; --muted:#6b7280; --ok:#2e7d32; --bad:#c62828;
+          --confirmed:#c62828; --composite:#ef6c00; --weak:#f9a825; --unknown:#757575; --none:#2e7d32; --accent:#1e56a0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:16px; padding:14px 24px; background:#fff; border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; background:#e8eaf0; color:#333; }
+  .badge.live { background:#e3f2e6; color:var(--ok); }
+  #hint { color:var(--muted); font-size:12px; }
+  nav.tabs { display:flex; gap:4px; padding:10px 24px 0; }
+  nav.tabs button { border:1px solid var(--line); border-bottom:none; background:#eef0f4; padding:8px 16px; cursor:pointer; border-radius:8px 8px 0 0; font-size:14px; }
+  nav.tabs button.active { background:#fff; font-weight:700; }
+  main { padding:16px 24px 40px; }
+  #tab-batch { display:grid; grid-template-columns:260px 1fr; gap:16px; }
+  aside, .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  aside h2, .card h3 { margin:0 0 10px; font-size:14px; color:var(--accent); }
+  #examples { list-style:none; margin:0; padding:0; }
+  #examples li { padding:8px 10px; border-radius:6px; cursor:pointer; margin-bottom:4px; border:1px solid transparent; }
+  #examples li:hover { background:#f0f3f8; }
+  #examples li.active { background:#e8effa; border-color:#b9c9e6; font-weight:600; }
+  #examples small { display:block; color:var(--muted); font-weight:400; }
+  #live-controls { margin-top:14px; padding-top:12px; border-top:1px dashed var(--line); }
+  button.primary { background:var(--accent); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; width:100%; font-size:13px; }
+  button.primary:disabled { opacity:.5; cursor:default; }
+  #upload { margin-top:8px; width:100%; font-size:12px; }
+  #live-msg { font-size:12px; color:var(--muted); margin-top:8px; white-space:pre-wrap; }
+  #cards { display:flex; flex-direction:column; gap:12px; }
+  .meta { color:var(--muted); font-size:12px; font-weight:400; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:10px; color:#fff; font-size:12px; font-weight:700; }
+  .pill.good { background:var(--ok); } .pill.bad { background:var(--bad); }
+  .pill.confirmed { background:var(--confirmed); } .pill.composite { background:var(--composite); }
+  .pill.weak { background:var(--weak); color:#333; } .pill.unknown { background:var(--unknown); } .pill.none { background:var(--none); }
+  .bar { position:relative; height:14px; background:#eef0f4; border-radius:4px; overflow:visible; }
+  .bar > span { position:absolute; left:0; top:0; bottom:0; background:var(--accent); border-radius:4px; }
+  .bar.ratio > span { background:var(--bad); }
+  .bar .th { position:absolute; top:-3px; bottom:-3px; width:2px; background:#333; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.num { font-variant-numeric:tabular-nums; text-align:right; }
+  tr.selected td { background:#fdecea; font-weight:600; }
+  tr.alt td { background:#fff8e1; }
+  tr.other td { background:#eef4fb; }
+  tr.group td { background:#f3f4f6; color:var(--muted); font-size:12px; }
+  .contrib .row { display:grid; grid-template-columns:170px 1fr 70px; gap:8px; align-items:center; font-size:13px; padding:2px 0; }
+  .contrib .row.top5 { font-weight:600; }
+  .reason { font-size:13px; line-height:1.6; }
+  ul.docs, ul.actions { margin:6px 0; padding-left:20px; font-size:13px; line-height:1.6; }
+  .kv { display:grid; grid-template-columns:120px 1fr; gap:4px 12px; font-size:13px; }
+  .scenario-buttons { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .scenario-buttons button { padding:8px 14px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  .scenario-buttons button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #scenario-label { margin:4px 0 10px; color:var(--muted); font-size:13px; }
+  #chart svg, #band svg { width:100%; height:auto; display:block; background:#fff; border:1px solid var(--line); border-radius:10px; }
+  #band { margin-top:8px; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--muted); margin:8px 0; flex-wrap:wrap; }
+  .legend span[style]::before { content:""; display:inline-block; width:10px; height:10px; margin-right:4px; border-radius:2px; background:var(--c); }
+  #day-detail { margin-top:12px; }
+  .event { border-left:4px solid var(--accent); padding:6px 10px; margin:6px 0; background:#f7f9fc; font-size:13px; }
+  .event.rejected { border-color:var(--bad); } .event.promoted { border-color:var(--ok); }
+  .event.shadow_started, .event.shadow_ended { border-color:#8e24aa; }
+  .note { color:var(--muted); font-size:12px; }
+  .error { color:var(--bad); font-size:13px; }
+  @media (max-width:900px) { #tab-batch { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>CNC 이상탐지 · 조치 가이드 데모</h1>
+  <span id="status" class="badge">기록 모드</span>
+  <span id="hint"></span>
+  <span id="generated" class="note" style="margin-left:auto"></span>
+</header>
+<nav class="tabs">
+  <button data-tab="batch" class="active">배치 진단 흐름</button>
+  <button data-tab="timeline">시나리오 타임라인</button>
+</nav>
+<main>
+  <section id="tab-batch">
+    <aside>
+      <h2>입력 배치</h2>
+      <ul id="examples"></ul>
+      <div id="live-controls" hidden>
+        <button id="recompute" class="primary">실시간으로 다시 계산</button>
+        <input type="file" id="upload" accept=".csv">
+        <div id="live-msg"></div>
+      </div>
+      <p class="note" id="mode-note"></p>
+    </aside>
+    <div id="cards"></div>
+  </section>
+  <section id="tab-timeline" hidden>
+    <div class="scenario-buttons" id="scenario-buttons"></div>
+    <p id="scenario-label"></p>
+    <div class="legend">
+      <span style="--c:#1e56a0">일 평균 배율</span><span style="--c:#c62828">확정</span><span style="--c:#ef6c00">복합 징후</span>
+      <span style="--c:#f9a825">약한 신호</span><span style="--c:#757575">판단 불가</span><span style="--c:#9ccc9c">정상 판정 배치</span><span style="--c:#fdecea">실제 불량 구간</span>
+      <span>▲ 트리거 · ✕ 거부 · ◆ 섀도우 시작 · ◇ 섀도우 종료 · ★ 승격</span>
+    </div>
+    <div id="chart"></div>
+    <div id="band"></div>
+    <div id="day-detail"><p class="note">그래프나 띠에서 날짜를 클릭하면 그날 배치 5개와 이벤트가 나옵니다.</p></div>
+    <p class="note">판정은 champion v1 기준 오프라인 계산(rag/eval_playbook.py), 이벤트는 2026-09-02 라이브 워커 로그. 온도 시나리오는 Day 64 승격 뒤 실제 운영에서는 새 champion이 판정한다.</p>
+  </section>
+</main>
+<script id="demo-data" type="application/json">__DEMO_DATA__</script>
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('demo-data').textContent);
+  const $ = (sel) => document.querySelector(sel);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = (x, d = 2) => (x === null || x === undefined) ? '-' : Number(x).toFixed(d);
+  const TOP_N = 5, WEAK_Z = 10, COMPOSITE_RATIO = 0.5;
+  const state = { exampleKey: null, live: false, scenario: null, day: null };
+
+  document.querySelectorAll('nav.tabs button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x === b));
+    $('#tab-batch').hidden = b.dataset.tab !== 'batch';
+    $('#tab-timeline').hidden = b.dataset.tab !== 'timeline';
+  }));
+  $('#generated').textContent = `생성 ${DATA.generated_at} · 플레이북 ${(DATA.versions && DATA.versions.playbook) || '-'}`;
+
+  // ---------- 탭 1: 예시 목록 ----------
+  function renderExamples() {
+    const ul = $('#examples'); ul.innerHTML = '';
+    DATA.examples.forEach((ex) => {
+      const li = document.createElement('li');
+      const f = ex.response.fault;
+      li.innerHTML = `${esc(ex.label)}<small>${esc(ex.key)} · ${ex.response.predicted_label_text === 'bad' ? '불량' : '정상'} · ${esc(f ? f.verdict_ko : '-')}</small>`;
+      li.addEventListener('click', () => selectExample(ex.key));
+      ul.appendChild(li);
+    });
+  }
+  function selectExample(key) {
+    state.exampleKey = key;
+    document.querySelectorAll('#examples li').forEach((li, i) => li.classList.toggle('active', DATA.examples[i].key === key));
+    const ex = DATA.examples.find((e) => e.key === key);
+    showResponse(ex.response, {source: '기록', label: ex.label});
+  }
+
+  // ---------- 탭 1: 카드 ----------
+  function coverage(signature, contribs) {
+    const top = contribs.slice(0, TOP_N); if (!top.length) return 0;
+    let total = 0, got = 0;
+    top.forEach((c, i) => { const w = 1 / (i + 1); total += w; if (signature.includes(c.feature)) got += w; });
+    return Math.round((got / total) * 100) / 100;
+  }
+  function chunkNames(fault) {
+    const general = DATA.playbook.filter((p) => p.category === 'general').map((p) => `${p.name} (플레이북)`);
+    const safety = ['OSHA 안전 수칙 3개'];
+    if (!fault || fault.verdict === 'none') return [];
+    if (fault.verdict === 'unknown') return [...general, ...safety];
+    const sel = `${fault.situation} (플레이북, 선택)`;
+    if (fault.verdict === 'weak') return [sel, ...general, ...safety];
+    if (fault.verdict === 'composite') {
+      const other = fault.other_group ? [`${fault.other_group.situation} (플레이북, 다른 구역 1위)`] : [];
+      return [sel, ...other, ...general, ...safety];
+    }
+    return [sel, ...(fault.alternatives || []).map((a) => `${a} (플레이북, 같은 구역 후보)`), '같은 카테고리 Sandvik 문서 2개 (임베딩 유사도 순)', ...safety];
+  }
+  function reasonText(fault) {
+    if (!fault) return '코퍼스가 없어 fault를 계산하지 못했습니다.';
+    const v = fault.verdict;
+    if (v === 'none') return '정상 판정이라 대조하지 않습니다.';
+    if (v === 'unknown') return `상위 ${TOP_N}개 센서를 설명하는 항목이 없습니다. 상위 센서 z ${fmt(fault.top_z, 1)}.`;
+    const og = fault.other_group;
+    const ogText = og ? `다른 구역 최고는 ${og.situation} ${fmt(og.coverage)}` : '다른 구역은 0';
+    const half = fmt(fault.coverage * COMPOSITE_RATIO);
+    if (v === 'weak') return `상위 센서 z ${fmt(fault.top_z, 1)}이 기준 ${WEAK_Z} 미만이라 판단을 보류합니다. 참고 상황 ${fault.situation} (일치 ${fmt(fault.coverage)}).`;
+    if (v === 'composite') return `${fault.situation} 일치 ${fmt(fault.coverage)}인데 ${ogText}로 절반(${half}) 이상 → 두 구역이 함께 움직임. 드리프트 가능성, 라벨·추이 확인.`;
+    return `일치 센서 ${(fault.matched_features || []).join(', ')} → ${fault.situation} 일치 ${fmt(fault.coverage)}. ${ogText}로 절반(${half}) 미만, 상위 센서 z ${fmt(fault.top_z, 1)} ≥ ${WEAK_Z}.`;
+  }
+  function showResponse(resp, meta) {
+    const fault = resp.fault, guide = resp.guide, contribs = resp.feature_contributions || [];
+    const ratio = resp.score / resp.threshold, scale = Math.max(4, ratio);
+    const isBad = resp.predicted_label_text === 'bad';
+    const cards = [];
+    cards.push(`<div class="card"><h3>1. 판정 <span class="meta">${esc(meta.source)}${meta.elapsed ? ` · ${meta.elapsed}s` : ''} · ${esc(meta.label || '')}</span></h3>
+      <p><span class="pill ${isBad ? 'bad' : 'good'}">${isBad ? '불량' : '정상'}</span>
+      &nbsp; 이상 점수 <b>${fmt(resp.score, 3)}</b> · 판정 기준 <b>${fmt(resp.threshold, 4)}</b> · 기준 대비 배율 <b>${fmt(ratio)}</b> · method ${esc(resp.method)}</p>
+      <div class="bar ratio"><span style="width:${Math.min(100, ratio / scale * 100)}%"></span><i class="th" style="left:${(1 / scale) * 100}%"></i></div>
+      <p class="meta">검은 선이 판정 기준(배율 1.0) · 모델 v${esc(resp.model_version)}</p></div>`);
+    const top10 = contribs.slice(0, 10);
+    const maxZ = Math.max(1e-9, ...top10.map((c) => c.z_score));
+    cards.push(`<div class="card contrib"><h3>2. 센서 기여도 <span class="meta">정상 대비 z-score 상위 10개 · 굵은 5개가 대조 범위</span></h3>
+      ${top10.map((c, i) => `<div class="row ${i < TOP_N ? 'top5' : ''}"><span>${i + 1}. ${esc(c.feature)}</span><div class="bar"><span style="width:${Math.max(1, c.z_score / maxZ * 100)}%"></span></div><span class="num">${fmt(c.z_score, 1)}</span></div>`).join('')}
+      ${top10.length ? '' : '<p class="meta">기여도 없음</p>'}</div>`);
+    if (fault && fault.verdict !== 'none') {
+      let rows = '', lastCat = null;
+      DATA.playbook.forEach((p) => {
+        if (p.category_ko !== lastCat) { rows += `<tr class="group"><td colspan="4">${esc(p.category_ko)}</td></tr>`; lastCat = p.category_ko; }
+        const cov = coverage(p.signature, contribs);
+        const isSel = p.name === fault.situation, isAlt = (fault.alternatives || []).includes(p.name), isOther = !!(fault.other_group && p.name === fault.other_group.situation);
+        const cls = isSel ? 'selected' : isAlt ? 'alt' : isOther ? 'other' : '';
+        const tag = isSel ? ' ← 선택' : isAlt ? ' (같은 구역 후보)' : isOther ? ' (다른 구역 1위)' : '';
+        rows += `<tr class="${cls}"><td>${esc(p.name)}${tag}</td><td class="meta">${p.signature.length ? esc(p.signature.join(', ')) : '없음'}</td><td><div class="bar"><span style="width:${cov * 100}%"></span></div></td><td class="num">${fmt(cov)}</td></tr>`;
+      });
+      cards.push(`<div class="card"><h3>3. 플레이북 대조 <span class="meta">항목의 관련 센서가 상위 ${TOP_N}개 센서(1/순위 가중)를 설명하는 비율</span></h3>
+        <table><thead><tr><th>상황</th><th>관련 센서</th><th style="width:30%">일치도</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`);
+    } else {
+      cards.push(`<div class="card"><h3>3. 플레이북 대조</h3><p class="meta">${fault ? '정상 판정이라 대조하지 않습니다.' : '코퍼스 미로드 — fault 없음'}</p></div>`);
+    }
+    cards.push(`<div class="card"><h3>4. 판정</h3>
+      <p>${fault ? `<span class="pill ${fault.verdict}">${esc(fault.verdict_ko)}</span> &nbsp; ${fault.situation ? `<b>${esc(fault.situation)}</b> (${esc(fault.category || '')})` : ''}` : '<span class="pill unknown">fault 없음</span>'}</p>
+      <p class="reason">${esc(reasonText(fault))}</p></div>`);
+    const docs = chunkNames(fault);
+    cards.push(`<div class="card"><h3>5. LLM에 준 참고 문서 <span class="meta">판정별 선택 규칙을 재현한 목록</span></h3>
+      ${docs.length ? `<ul class="docs">${docs.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : '<p class="meta">정상 판정 — 문서를 쓰지 않습니다.</p>'}</div>`);
+    if (guide) {
+      const list = (arr) => `<ul class="actions">${(arr || []).map((a) => `<li>${esc(a)}</li>`).join('') || '<li>-</li>'}</ul>`;
+      cards.push(`<div class="card"><h3>6. 조치 가이드 <span class="meta">LLM 작성 · 문장은 호출마다 달라질 수 있음</span></h3>
+        <div class="kv"><span>원인 추정</span><span>${esc(guide.cause_estimate)}</span>
+        <span>확신도</span><span>${esc(guide.confidence_note || '-')}</span>
+        <span>권장 조치</span><span>${list(guide.recommended_actions)}</span>
+        <span>안전 수칙</span><span>${list(guide.safety_notes)}</span>
+        <span>출처</span><span>${(guide.sources || []).map((s) => esc(s.title)).join(' · ') || '-'}</span></div></div>`);
+    } else {
+      cards.push(`<div class="card"><h3>6. 조치 가이드</h3><p class="meta">guide가 null — OpenAI 키가 없거나 코퍼스 미로드. fault는 위와 같이 계산됩니다.</p></div>`);
+    }
+    const ver = resp.versions || {};
+    cards.push(`<div class="card"><h3>7. versions</h3><div class="kv"><span>playbook</span><span>${esc(ver.playbook || '-')}</span><span>corpus</span><span>${esc(ver.corpus || '-')}</span><span>chat_model</span><span>${esc(ver.chat_model || '-')}</span><span>mlflow_run_id</span><span>${esc(resp.mlflow_run_id || '-')}</span></div></div>`);
+    $('#cards').innerHTML = cards.join('');
+  }
+
+  // ---------- 실시간 ----------
+  async function fetchWithTimeout(url, opts, ms) {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+    try { return await fetch(url, Object.assign({}, opts, {signal: ctl.signal})); } finally { clearTimeout(t); }
+  }
+  async function detectLive() {
+    if (location.protocol === 'file:') { $('#mode-note').textContent = '파일로 열었습니다. 서버를 띄우고 /demo 로 열면 실시간 재계산이 가능합니다.'; return; }
+    try {
+      const r = await fetchWithTimeout('/health', {}, 3000);
+      if (!r.ok) throw new Error(r.status);
+      const h = await r.json();
+      state.live = true;
+      $('#status').textContent = `실시간 연결됨 · champion v${h.model_version}`; $('#status').classList.add('live');
+      $('#live-controls').hidden = false;
+      $('#mode-note').textContent = '예시를 고른 뒤 다시 계산하거나 CSV를 올리면 실제 /predict 결과로 카드가 바뀝니다.';
+    } catch (e) {
+      $('#hint').textContent = '서버 응답 없음 → 기록 모드';
+    }
+  }
+  async function postPredict(blob, filename, label) {
+    const fd = new FormData(); fd.append('file', blob, filename);
+    const btn = $('#recompute'); btn.disabled = true; $('#live-msg').textContent = `계산 중… (${filename})`;
+    const t0 = performance.now();
+    try {
+      const r = await fetchWithTimeout('/predict', {method: 'POST', body: fd}, 90000);
+      const body = await r.json();
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${body.detail || ''}`);
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+      showResponse(body, {source: '실시간', label, elapsed});
+      $('#live-msg').textContent = `완료 · ${elapsed}s · ${body.fault ? body.fault.verdict_ko : '-'} ${body.fault && body.fault.situation ? body.fault.situation : ''}`;
+    } catch (e) {
+      $('#live-msg').innerHTML = `<span class="error">실패: ${esc(e.message || e)}</span>`;
+    } finally { btn.disabled = false; }
+  }
+  $('#recompute').addEventListener('click', async () => {
+    if (!state.exampleKey) { $('#live-msg').textContent = '먼저 예시를 고르세요.'; return; }
+    try {
+      const r = await fetchWithTimeout(`/demo/inputs/${state.exampleKey}`, {}, 30000);
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(`입력 파일 ${r.status}: ${b.detail || ''}`); }
+      const ex = DATA.examples.find((e) => e.key === state.exampleKey);
+      await postPredict(await r.blob(), `${state.exampleKey}.csv`, ex ? ex.label : state.exampleKey);
+    } catch (e) { $('#live-msg').innerHTML = `<span class="error">실패: ${esc(e.message || e)}</span>`; }
+  });
+  $('#upload').addEventListener('change', (ev) => { const f = ev.target.files[0]; if (f) postPredict(f, f.name, f.name); });
+
+  // ---------- 탭 2: 타임라인 ----------
+  const COLORS = {confirmed: '#c62828', composite: '#ef6c00', weak: '#f9a825', unknown: '#757575'};
+  const MARK = {trigger: '▲', rejected: '✕', shadow_started: '◆', shadow_ended: '◇', promoted: '★'};
+  const MARK_COLOR = {trigger: '#1e56a0', rejected: '#c62828', shadow_started: '#8e24aa', shadow_ended: '#8e24aa', promoted: '#2e7d32'};
+  function renderScenarioButtons() {
+    const box = $('#scenario-buttons'); box.innerHTML = '';
+    Object.entries(DATA.scenarios).forEach(([name, sc]) => {
+      const b = document.createElement('button'); b.textContent = sc.label; b.dataset.name = name;
+      b.addEventListener('click', () => renderScenario(name)); box.appendChild(b);
+    });
+  }
+  function renderScenario(name) {
+    state.scenario = name; state.day = null;
+    document.querySelectorAll('#scenario-buttons button').forEach((b) => b.classList.toggle('active', b.dataset.name === name));
+    const sc = DATA.scenarios[name];
+    const nBad = sc.days.reduce((s, d) => s + d.batches.filter((b) => b.pred === 'bad').length, 0);
+    $('#scenario-label').textContent = `${sc.label} · ${sc.days_total}일 × 5배치 · 불량 판정 ${nBad}건 · 이벤트 ${sc.events.length}건${sc.fault_from_day ? ` · Day ${sc.fault_from_day}부터 실제 불량` : ' · 실제 라벨은 전부 정상'}`;
+    const W = 960, H = 280, L = 44, R = 12, T = 16, B = 28, days = sc.days, n = days.length, cw = (W - L - R) / n;
+    const ymax = Math.max(2, ...days.flatMap((d) => d.batches.map((b) => b.ratio))) * 1.05;
+    const x = (day) => L + (day - 0.5) * cw, y = (v) => T + (1 - v / ymax) * (H - T - B);
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    if (sc.fault_from_day) s += `<rect x="${x(sc.fault_from_day) - cw / 2}" y="${T}" width="${W - R - x(sc.fault_from_day) + cw / 2}" height="${H - T - B}" fill="#fdecea"/>`;
+    for (let v = 0; v <= ymax; v += 0.5) s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#eee"/><text x="${L - 6}" y="${y(v) + 4}" font-size="10" text-anchor="end" fill="#888">${v.toFixed(1)}</text>`;
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(1)}" y2="${y(1)}" stroke="#333" stroke-dasharray="4 3"/>`;
+    days.forEach((d) => { if (d.day % 5 === 0 || d.day === 1) s += `<text x="${x(d.day)}" y="${H - 8}" font-size="10" text-anchor="middle" fill="#888">D${d.day}</text>`; });
+    days.forEach((d) => d.batches.forEach((b) => { s += `<circle cx="${x(d.day)}" cy="${y(b.ratio)}" r="2.5" fill="${b.pred === 'bad' ? (COLORS[b.verdict] || '#c62828') : '#9ccc9c'}" opacity="0.85"/>`; }));
+    s += `<polyline fill="none" stroke="#1e56a0" stroke-width="2" points="${days.map((d) => `${x(d.day)},${y(d.ratio_mean)}`).join(' ')}"/>`;
+    sc.events.forEach((ev) => {
+      if (ev.day == null || ev.day > n) return;
+      const col = MARK_COLOR[ev.kind] || '#999';
+      s += `<line x1="${x(ev.day)}" x2="${x(ev.day)}" y1="${T}" y2="${H - B}" stroke="${col}" stroke-width="1" opacity="0.5"/><text x="${x(ev.day)}" y="${T + 12}" font-size="12" text-anchor="middle" fill="${col}">${MARK[ev.kind] || '•'}</text>`;
+    });
+    days.forEach((d) => { s += `<rect class="hit" data-day="${d.day}" x="${x(d.day) - cw / 2}" y="${T}" width="${cw}" height="${H - T - B}" fill="transparent" style="cursor:pointer"><title>Day ${d.day} · 평균 배율 ${d.ratio_mean.toFixed(2)}</title></rect>`; });
+    s += '</svg>';
+    $('#chart').innerHTML = s;
+    const BH = 90, bh = (BH - 20) / 5;
+    let b = `<svg viewBox="0 0 ${W} ${BH}" xmlns="http://www.w3.org/2000/svg">`;
+    days.forEach((d) => {
+      let yy = BH - 16;
+      ['unknown', 'weak', 'composite', 'confirmed'].forEach((v) => {
+        const k = d.batches.filter((bb) => bb.pred === 'bad' && bb.verdict === v).length;
+        if (k) { b += `<rect x="${x(d.day) - cw / 2 + 1}" y="${yy - k * bh}" width="${cw - 2}" height="${k * bh}" fill="${COLORS[v]}"/>`; yy -= k * bh; }
+      });
+      b += `<rect class="hit" data-day="${d.day}" x="${x(d.day) - cw / 2}" y="0" width="${cw}" height="${BH}" fill="transparent" style="cursor:pointer"/>`;
+    });
+    b += `<text x="${L}" y="${BH - 3}" font-size="10" fill="#888">일별 불량 판정 배치 수(최대 5)와 판정 종류</text></svg>`;
+    $('#band').innerHTML = b;
+    document.querySelectorAll('#chart rect.hit, #band rect.hit').forEach((r) => r.addEventListener('click', () => renderDay(name, Number(r.dataset.day))));
+    $('#day-detail').innerHTML = '<p class="note">그래프나 띠에서 날짜를 클릭하면 그날 배치 5개와 이벤트가 나옵니다.</p>';
+  }
+  function renderDay(name, day) {
+    state.day = day;
+    const sc = DATA.scenarios[name], d = sc.days.find((x) => x.day === day), evs = sc.events.filter((e) => e.day === day);
+    let h = `<div class="card"><h3>Day ${day} <span class="meta">실제 라벨 ${d.truth === 'bad' ? '불량' : '정상'} · 평균 배율 ${d.ratio_mean.toFixed(2)}</span></h3>
+      <table><thead><tr><th>배치</th><th>배율</th><th>판정</th><th>진단</th><th>상황</th><th>일치</th><th>상위 센서</th></tr></thead><tbody>`;
+    d.batches.forEach((b) => {
+      h += `<tr><td>day${String(day).padStart(2, '0')}_${b.index}</td><td class="num">${b.ratio.toFixed(2)}</td><td><span class="pill ${b.pred === 'bad' ? 'bad' : 'good'}">${b.pred === 'bad' ? '불량' : '정상'}</span></td>
+        <td>${b.pred === 'bad' ? `<span class="pill ${b.verdict}">${esc(b.verdict_ko)}</span>` : '-'}</td><td>${esc(b.situation || '-')}</td><td class="num">${b.pred === 'bad' ? b.coverage.toFixed(2) : '-'}</td>
+        <td class="meta">${(b.top || []).map(([f, z]) => `${esc(f)} ${Number(z).toFixed(1)}`).join(' · ')}</td></tr>`;
+    });
+    h += '</tbody></table>';
+    if (evs.length) {
+      h += '<h3 style="margin-top:14px">이 날의 루프 이벤트</h3>';
+      evs.forEach((e) => {
+        h += `<div class="event ${e.kind}"><b>${MARK[e.kind] || '•'} ${esc(e.text)}</b>`;
+        if (e.gate) h += `<div class="meta">게이트: ${esc(e.gate)}</div>`;
+        if (e.reason) h += `<div>사유: ${esc(e.reason)}</div>`;
+        if (e.cause) h += `<div>추정 원인: <b>${esc(e.cause)}</b> · 권장 조치: ${esc(e.actions)}</div>`;
+        h += '</div>';
+      });
+    } else { h += '<p class="note">이 날은 루프 이벤트가 없습니다.</p>'; }
+    h += '</div>';
+    $('#day-detail').innerHTML = h;
+  }
+
+  renderExamples();
+  if (DATA.examples.length) selectExample(DATA.examples[0].key);
+  renderScenarioButtons();
+  const firstScenario = Object.keys(DATA.scenarios)[0]; if (firstScenario) renderScenario(firstScenario);
+  detectLive();
+})();
+</script>
+</body>
+</html>
