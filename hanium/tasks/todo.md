@@ -492,3 +492,30 @@ fixture_loosening Day 34와 정반대 — 곱셈 램프는 정상으로 학습�
 **실행 중 배운 것**: `pkill -f 'drift_worker.py <시나리오>'`처럼 패턴에
 스크립트 인자를 넣으면 그 명령을 담은 셸 자신도 매칭돼 먼저 죽는다 —
 PID 파일(`kill $(cat worker.pid)`)이나 `pgrep -f '[d]rift_worker'` 형태로.
+
+## 플레이북 기반 조치 가이드 (2026-09-03)
+
+배경: 사용자가 RAG가 "구시대적"이라 느껴 브레인스토밍 → 09-02 에이전트 스펙
+작성 → 09-03 사용자 제안("시나리오 문서를 많이 써서 활용")을 실험으로 검증.
+문서 4개는 4/4 맞지만 16개로 늘리면 임베딩 검색 2/4. 문서의 `관련 센서` 코드와
+상위 피처를 대조하는 방식이 4/4 + 타임라인 600건(고장 2종 100%, 온도는
+복합 징후·약한 신호로 분리)에서 검증됨. 증거는
+`02-cnc-machining/data/monitoring/_signature_spike_20260903/`.
+
+**사용자 결정(2026-09-03)**: 플레이북 + 서명 대조 + 세 단계 판정으로 간다.
+진단 에이전트 API(09-02 스펙 Part A·D)는 보류.
+
+스펙 `02-cnc-machining/docs/specs/2026-09-03-cnc-playbook-guide-design.md`,
+계획 `02-cnc-machining/docs/plans/2026-09-03-cnc-playbook-guide.md`.
+
+- [ ] Task 1 플레이북 문서 16항목 + `parse_playbook`
+- [ ] Task 2 `coverage`·`match_playbook`·세 단계 판정 (기록 4건 4/4)
+- [ ] Task 3 `build_corpus.py`에 플레이북 포함, 코퍼스 재빌드(42청크)
+- [ ] Task 4 프롬프트 — 시스템 판정 줄, 공구 마모 유도 문장 제거
+- [ ] Task 5 판정별 청크 선택 `select_chunks`, `build_guide` 새 경로
+- [ ] Task 6 `/predict` 응답 `fault` 필드, README·STRUCTURE
+- [ ] Task 7 `rag/eval_playbook.py` 오프라인 채점 → 스펙 정정 절
+- [ ] Task 8 라이브 검증 5건 → `docs/examples/`, 키 없이 폴백 확인, push
+
+미결: 플레이북 16항목 내용의 도메인 검토(팀·멘토). 팀원 Spring 쪽에 `fault`
+필드 추가를 알릴 것(기존 9개 키·`guide` 스키마는 불변).

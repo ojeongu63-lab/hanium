@@ -1,5 +1,9 @@
 # 진단 에이전트 + 카테고리 기반 RAG 설계
 
+> **2026-09-03 보류.** 사용자 결정으로 에이전트 API(Part A·D)는 보류하고, Part B·C가
+> 풀려던 문제는 `2026-09-03-cnc-playbook-guide-design.md`(플레이북 + 센서 서명
+> 대조)로 대체했다. 손으로 짠 `FAULT_GROUPS` 규칙은 문서의 `관련 센서` 줄로 옮겨갔다.
+
 작성 2026-09-02. 선행 스펙: `2026-08-12-cnc-rag-action-guide-design.md`(`/predict`
 가이드), `2026-08-26-cnc-cause-estimation-design.md`(거부 경로 원인 추정),
 `2026-09-02-cnc-two-sided-gate-design.md`.
