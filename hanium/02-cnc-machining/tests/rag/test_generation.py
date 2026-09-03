@@ -72,7 +72,7 @@ def test_generate_guide_includes_confidence_principle_in_system_prompt():
     messages = client.chat.completions.last_kwargs["messages"]
     assert messages[0]["role"] == "system"
     assert "단정하지" in messages[0]["content"]
-    assert "tool_condition" in messages[0]["content"]
+    assert "통계적 이상" in messages[0]["content"]   # 옛 tool_condition 문장은 공구 마모를 유도해 제거함
 
 
 def test_generate_guide_includes_retrieved_chunk_text_in_user_prompt():
@@ -121,3 +121,50 @@ def test_generate_cause_guide_includes_cause_and_chunk_text_in_user_prompt():
     messages = client.chat.completions.last_kwargs["messages"]
     assert "tool_wear" in messages[1]["content"]
     assert "Reduce cutting speed" in messages[1]["content"]
+
+
+from rag.generation import SYSTEM_PROMPT, describe_fault
+
+_CHUNK = {"title": "팀 시나리오 플레이북(자체 작성)", "url": "rag/sources/scenario_playbook.md",
+          "content_type": "cause", "text": "관련 센서: S_OutputCurrent\n조치: 교체"}
+
+_CONFIRMED = {
+    "verdict": "confirmed", "verdict_ko": "확정", "situation": "공구 마모", "category": "tool_wear",
+    "coverage": 0.8, "matched_features": ["S_OutputCurrent", "S_OutputPower"],
+    "alternatives": ["스핀들 베어링 손상"], "other_group": None, "top_z": 36.1,
+}
+
+
+def test_system_prompt_no_longer_primes_tool_wear():
+    assert "tool_condition" not in SYSTEM_PROMPT
+    assert "시스템 판정" in SYSTEM_PROMPT
+
+
+def test_describe_fault_per_verdict():
+    assert describe_fault(_CONFIRMED) == (
+        "시스템 판정: 확정 — 공구 마모 (센서 서명 일치 0.80, 일치 센서: S_OutputCurrent, S_OutputPower)\n"
+        "같은 구역의 다른 후보(현장 확인으로 구분): 스핀들 베어링 손상"
+    )
+    composite = {**_CONFIRMED, "verdict": "composite", "coverage": 0.66,
+                 "other_group": {"situation": "이송축 과부하", "category": "feed_overload", "coverage": 0.44}}
+    assert describe_fault(composite).startswith(
+        "시스템 판정: 복합 징후 — 공구 마모(0.66)와 이송축 과부하(0.44)가 함께 나타남"
+    )
+    weak = {**_CONFIRMED, "verdict": "weak", "top_z": 4.4}
+    assert describe_fault(weak) == (
+        "시스템 판정: 약한 신호 — 상위 센서 z 4.4 (기준 10 미만). 보류·재확인을 권할 것. 참고 상황: 공구 마모"
+    )
+    unknown = {**_CONFIRMED, "verdict": "unknown", "situation": None}
+    assert describe_fault(unknown) == "시스템 판정: 판단 불가 — 서명이 일치하는 상황 없음. 현장 확인을 권할 것."
+
+
+def test_generate_guide_includes_fault_line_only_when_given():
+    client = _FakeClient(json.dumps(_PAYLOAD))
+    generate_guide(_PREDICT_RESULT, [_CHUNK], client, fault=_CONFIRMED)
+    with_fault = client.chat.completions.last_kwargs["messages"][1]["content"]
+    assert "시스템 판정: 확정 — 공구 마모" in with_fault
+    assert with_fault.index("상위 이상 피처") < with_fault.index("시스템 판정") < with_fault.index("참고 문서")
+
+    generate_guide(_PREDICT_RESULT, [_CHUNK], client)
+    without = client.chat.completions.last_kwargs["messages"][1]["content"]
+    assert "시스템 판정" not in without

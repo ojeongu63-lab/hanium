@@ -1,14 +1,17 @@
 import json
 import os
 
+from .playbook import WEAK_Z
+
 DEFAULT_MODEL = "gpt-4o-mini"
 
 SYSTEM_PROMPT = (
     "당신은 CNC 가공 현장의 이상탐지 결과를 설명하는 어시스턴트입니다.\n"
-    "이 모델은 tool_condition(공구 마모 여부)을 입력으로 학습한 적이 없습니다 "
-    "- 간접적인 센서 신호(전류/파워 등)로만 추정하는 것이므로, 원인을 단정하지 "
-    "말고 '~일 가능성이 있습니다', '~로 추정됩니다' 같은 확신도를 낮춘 표현을 "
-    "쓰세요.\n"
+    "판정은 센서 신호의 통계적 이상만 본 것이므로 원인을 단정하지 말고 "
+    "'~일 가능성이 있습니다', '~로 추정됩니다' 같은 확신도를 낮춘 표현을 쓰세요.\n"
+    "시스템 판정과 시스템이 고른 상황을 원인의 중심에 두세요. 참고 문서에 없는 "
+    "원인을 덧붙이지 마세요. 같은 구역의 다른 후보는 '함께 확인할 것'으로만 "
+    "언급하세요. 판정이 확정이 아니면 조치보다 확인 절차를 앞세우세요.\n"
     "아래 JSON 스키마로만 답하세요:\n"
     '{"cause_estimate": str, "confidence_note": str, '
     '"recommended_actions": [str], "safety_notes": [str], '
@@ -29,7 +32,33 @@ CAUSE_SYSTEM_PROMPT = (
 )
 
 
-def _build_user_prompt(predict_result: dict, retrieved_chunks: list[dict]) -> str:
+def describe_fault(fault: dict) -> str:
+    """프롬프트에 넣는 '시스템 판정' 줄. 판정·상황·수치는 서버가 정한 값이다."""
+    verdict = fault["verdict"]
+    if verdict == "confirmed":
+        line = (
+            f"시스템 판정: 확정 — {fault['situation']} (센서 서명 일치 {fault['coverage']:.2f}, "
+            f"일치 센서: {', '.join(fault['matched_features'])})"
+        )
+        if fault["alternatives"]:
+            line += f"\n같은 구역의 다른 후보(현장 확인으로 구분): {', '.join(fault['alternatives'])}"
+        return line
+    if verdict == "composite":
+        other = fault["other_group"]
+        return (
+            f"시스템 판정: 복합 징후 — {fault['situation']}({fault['coverage']:.2f})와 "
+            f"{other['situation']}({other['coverage']:.2f})가 함께 나타남. 여러 센서가 같이 "
+            "이동하는 드리프트일 수 있음. 라벨·추이 확인을 권할 것."
+        )
+    if verdict == "weak":
+        return (
+            f"시스템 판정: 약한 신호 — 상위 센서 z {fault['top_z']:.1f} (기준 {WEAK_Z:g} 미만). "
+            f"보류·재확인을 권할 것. 참고 상황: {fault['situation']}"
+        )
+    return "시스템 판정: 판단 불가 — 서명이 일치하는 상황 없음. 현장 확인을 권할 것."
+
+
+def _build_user_prompt(predict_result: dict, retrieved_chunks: list[dict], fault: dict | None = None) -> str:
     lines = [
         f"판정: {predict_result['predicted_label_text']}, "
         f"점수: {predict_result['score']:.3f} "
@@ -40,6 +69,8 @@ def _build_user_prompt(predict_result: dict, retrieved_chunks: list[dict]) -> st
         "상위 이상 피처: "
         + ", ".join(f"{c['feature']}(z={c['z_score']:.1f})" for c in top3)
     )
+    if fault is not None:
+        lines.append(describe_fault(fault))
     lines.append("\n참고 문서:")
     for chunk in retrieved_chunks:
         lines.append(
@@ -50,7 +81,7 @@ def _build_user_prompt(predict_result: dict, retrieved_chunks: list[dict]) -> st
 
 
 def generate_guide(
-    predict_result: dict, retrieved_chunks: list[dict], client
+    predict_result: dict, retrieved_chunks: list[dict], client, fault: dict | None = None
 ) -> dict:
     model = os.environ.get("OPENAI_CHAT_MODEL", DEFAULT_MODEL)
     response = client.chat.completions.create(
@@ -59,7 +90,7 @@ def generate_guide(
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": _build_user_prompt(predict_result, retrieved_chunks),
+                "content": _build_user_prompt(predict_result, retrieved_chunks, fault),
             },
         ],
         response_format={"type": "json_object"},
