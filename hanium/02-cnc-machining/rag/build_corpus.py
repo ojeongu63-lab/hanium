@@ -1,4 +1,5 @@
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -7,6 +8,10 @@ import numpy as np
 from openai import OpenAI
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from preprocessing.columns import FEATURE_COLUMNS  # noqa: E402
+from rag.playbook import PLAYBOOK_META, PLAYBOOK_SOURCE, parse_playbook  # noqa: E402
 SOURCES_DIR = Path(__file__).resolve().parent / "sources"
 OUT_DIR = ROOT / "data" / "rag"
 EMBEDDING_MODEL = "text-embedding-3-small"
@@ -145,6 +150,7 @@ def build_corpus() -> list[dict]:
     sandvik_text = (SOURCES_DIR / "sandvik_milling_troubleshooting.md").read_text()
     osha_text = (SOURCES_DIR / "osha_machine_guarding_lockout.md").read_text()
     kamp_text = (SOURCES_DIR / "kamp_cnc_dataset_guide.md").read_text()
+    playbook_text = (SOURCES_DIR / "scenario_playbook.md").read_text()
 
     corpus = []
     for chunk in parse_sandvik(sandvik_text):
@@ -153,6 +159,8 @@ def build_corpus() -> list[dict]:
         corpus.append({**chunk, **OSHA_META})
     for chunk in parse_kamp_guide(kamp_text):
         corpus.append({**chunk, **KAMP_META})
+    for chunk in parse_playbook(playbook_text, known_features=set(FEATURE_COLUMNS)):
+        corpus.append({**chunk, **PLAYBOOK_META})
     return corpus
 
 
@@ -180,6 +188,8 @@ def main() -> None:
     faiss.write_index(index, str(OUT_DIR / "corpus.index"))
 
     print(f"청크 {len(corpus)}개 저장됨")
+    playbook_count = sum(c.get("source") == PLAYBOOK_SOURCE for c in corpus)
+    print(f"플레이북 항목 {playbook_count}개 (source == '{PLAYBOOK_SOURCE}', signature 포함)")
     print("fault_category 분포:", Counter(c["fault_category"] for c in corpus))
     print("content_type 분포:", Counter(c["content_type"] for c in corpus))
     print(f"저장: {OUT_DIR / 'corpus.json'}, {OUT_DIR / 'corpus.index'}")
