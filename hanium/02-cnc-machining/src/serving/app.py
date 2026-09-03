@@ -23,6 +23,7 @@ from monitoring.logging import count_requests, get_recent_requests, log_request
 from monitoring.mlflow_logging import log_drift_metrics
 from monitoring.shadow_log import record_shadow_prediction
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
+from rag.generation import DEFAULT_MODEL
 from serving.inference import predict_experiment, scale_features
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -43,24 +44,27 @@ class ModelState:
     rag_corpus: list[dict] | None = None
     rag_index: object | None = None
     openai_client: object | None = None
+    rag_versions: dict | None = None  # data/rag/corpus_meta.json (playbook 해시, 빌드 시각)
 
 
 _state: ModelState | None = None
 _shadow_state: ModelState | None = None
 
 
-def load_rag_state() -> tuple[list[dict] | None, object | None, object | None]:
+def load_rag_state() -> tuple[list[dict] | None, object | None, object | None, dict | None]:
     api_key = os.environ.get("OPENAI_API_KEY")
     openai_client = OpenAI(api_key=api_key) if api_key else None
 
     corpus_path = ROOT / "data" / "rag" / "corpus.json"
     index_path = ROOT / "data" / "rag" / "corpus.index"
     if not corpus_path.exists() or not index_path.exists():
-        return None, None, openai_client
+        return None, None, openai_client, None
 
     rag_corpus = json.loads(corpus_path.read_text())
     rag_index = faiss.read_index(str(index_path))
-    return rag_corpus, rag_index, openai_client
+    meta_path = ROOT / "data" / "rag" / "corpus_meta.json"
+    rag_versions = json.loads(meta_path.read_text()) if meta_path.exists() else None
+    return rag_corpus, rag_index, openai_client, rag_versions
 
 
 def load_companion_json(run_id: str, name: str, fallback: Path) -> dict:
@@ -93,8 +97,8 @@ def _build_model_state(mv, run, model, include_rag: bool) -> ModelState:
     feature_baseline = load_companion_json(
         mv.run_id, "feature_baseline.json", ROOT / "data" / "model" / "feature_baseline.json"
     )
-    rag_corpus, rag_index, openai_client = (
-        load_rag_state() if include_rag else (None, None, None)
+    rag_corpus, rag_index, openai_client, rag_versions = (
+        load_rag_state() if include_rag else (None, None, None, None)
     )
     return ModelState(
         model=model,
@@ -107,6 +111,7 @@ def _build_model_state(mv, run, model, include_rag: bool) -> ModelState:
         rag_corpus=rag_corpus,
         rag_index=rag_index,
         openai_client=openai_client,
+        rag_versions=rag_versions,
     )
 
 
@@ -201,6 +206,17 @@ async def predict(
         **result,
         "model_version": state.model_version,
         "mlflow_run_id": state.mlflow_run_id,
+        "versions": _versions(state),
+    }
+
+
+def _versions(state: ModelState) -> dict:
+    """fault·guide가 어떤 플레이북·코퍼스·LLM으로 만들어졌는지. RAG 미로드면 전부 None."""
+    meta = state.rag_versions or {}
+    return {
+        "playbook": meta.get("playbook"),
+        "corpus": meta.get("built_at"),
+        "chat_model": os.environ.get("OPENAI_CHAT_MODEL", DEFAULT_MODEL) if state.openai_client else None,
     }
 
 

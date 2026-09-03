@@ -188,3 +188,13 @@ def test_real_playbook_matches_recorded_cases(path, expected):
 
     assert result["situation"] == expected
     assert result["verdict"] == "confirmed"
+
+
+from rag.playbook import playbook_version
+
+
+def test_playbook_version_is_short_content_hash():
+    v = playbook_version("## 1. 스핀들 부하 상승\n### a — b\n관련 센서: 없음\n")
+    assert len(v) == 8 and all(c in "0123456789abcdef" for c in v)
+    assert v == playbook_version("## 1. 스핀들 부하 상승\n### a — b\n관련 센서: 없음\n")
+    assert v != playbook_version("다른 내용")

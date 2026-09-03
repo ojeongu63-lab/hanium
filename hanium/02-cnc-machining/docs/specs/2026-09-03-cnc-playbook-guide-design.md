@@ -406,3 +406,19 @@ def build_guide(predict_result, rag_corpus, rag_index, openai_client) -> dict | 
 관찰: tool_wear 가이드의 `confidence_note`가 서명 일치 0.80을 "맞을 확률이 높다"로
 읽었다. 일치도는 확률이 아니므로 프롬프트에 그 구분을 한 줄 더하는 것이 다음
 개선 후보다(이번 범위 밖).
+
+### 추가 — `versions` 객체 (2026-09-03 오후, 팀원 요청)
+
+Spring 쪽이 `fault`·`guide`의 생성 기준을 추적할 수 있게 응답 top-level에 `versions`를
+더했다(11번째 키, `fault`·`guide` 내부 구조는 그대로).
+
+```json
+"versions": {"playbook": "1c280cae", "corpus": "2026-09-03T14:55+09:00", "chat_model": "gpt-4o-mini"}
+```
+
+- `playbook`: 플레이북 문서 내용의 sha256 앞 8자리(`playbook_version`). 문서를 고치고
+  코퍼스를 다시 빌드하면 바뀐다.
+- `corpus`: `rag/build_corpus.py`가 기록한 빌드 시각. `data/rag/corpus_meta.json`에서 읽는다.
+- `chat_model`: `OPENAI_CHAT_MODEL`(기본 gpt-4o-mini). 키가 없으면 `null`.
+- 코퍼스 미구축이면 세 값 모두 `null`. 서버는 `load_rag_state`에서 메타를 한 번 읽어
+  `ModelState.rag_versions`에 둔다.

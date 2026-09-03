@@ -539,3 +539,7 @@ PID 파일(`kill $(cat worker.pid)`)이나 `pgrep -f '[d]rift_worker'` 형태로
 테스트가 cwd에 `mlflow.db`(790KB)를 만들어 놓는다 — 기존 현상, 지웠음. 다음 개선
 후보: 가이드 `confidence_note`가 서명 일치도를 확률로 읽는 문구(프롬프트 한 줄).
 
+**추가 (2026-09-03 오후)**: 팀원 요청으로 `/predict` top-level에 `versions`
+객체(playbook 해시·코퍼스 빌드 시각·chat_model) 추가. `data/rag/corpus_meta.json`을
+빌드 시 기록하고 서버가 읽는다. 테스트 200개, 예시 5개 재생성.
+

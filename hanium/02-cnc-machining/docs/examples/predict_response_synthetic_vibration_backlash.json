@@ -227,15 +227,15 @@
     "top_z": 42.32866287231445
   },
   "guide": {
-    "cause_estimate": "고정구 풀림이나 채터 현상으로 추정됩니다.",
-    "confidence_note": "센서 신호 일치도가 높은 상황으로, 해당 원인 가능성이 높습니다.",
+    "cause_estimate": "고정구 풀림으로 추정됩니다.",
+    "confidence_note": "기계 상태가 불안정하며, 실제 속도와 위치의 불규칙한 흔들림이 관찰되었습니다. 이는 고정구가 헐거워졌을 가능성을 시사합니다.",
     "recommended_actions": [
-      "기계를 정지하고 고정구와 클램프를 점검할 것",
-      "절삭 깊이를 낮추고 differential pitch 커터를 사용해볼 것"
+      "기계 정지를 통한 고정구와 클램프의 상태 점검 및 재체결을 실시해야 합니다.",
+      "절삭 깊이를 낮추고 differential pitch 커터를 사용하여 채터를 감소시킬 것을 권장합니다."
     ],
     "safety_notes": [
-      "작업자가 기계 정비 및 점검 시, 반드시 기계를 에너지원으로부터 격리해야 합니다.",
-      "가공점에 대한 방호 수단이 적절히 마련되어 있는지 확인해야 합니다."
+      "기계를 정비하기 전, 작동 상태에서 격리되어 있는지 확인해야 합니다.",
+      "작업자는 안전 장비를 착용하고 주의 깊게 작업을 진행해야 합니다."
     ],
     "sources": [
       {
@@ -245,13 +245,14 @@
       {
         "title": "Sandvik Coromant Milling Troubleshooting",
         "url": "https://www.sandvik.coromant.com/en-us/knowledge/milling/troubleshooting-milling"
-      },
-      {
-        "title": "OSHA Machine Guarding & Lockout/Tagout",
-        "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements"
       }
     ]
   },
   "model_version": "1",
-  "mlflow_run_id": "56635df9337b486999f5ce135e1da466"
+  "mlflow_run_id": "56635df9337b486999f5ce135e1da466",
+  "versions": {
+    "playbook": "1c280cae",
+    "corpus": "2026-09-03T14:55+09:00",
+    "chat_model": "gpt-4o-mini"
+  }
 }

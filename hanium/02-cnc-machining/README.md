@@ -98,6 +98,9 @@ nice -n 19 uv run uvicorn serving.app:app --port 8899
   `unknown` 판단 불가, 정상이면 `none`), 근거(`coverage`, `matched_features`,
   `alternatives`, `other_group`, `top_z`). 임베딩·LLM 없이 계산하므로 키 없이도 나오고
   같은 입력이면 같은 값. 코퍼스 미구축이면 `null`
+  + `versions`: `fault`·`guide`가 어떤 기준으로 만들어졌는지 — `playbook`(플레이북
+  문서 해시 앞 8자리), `corpus`(코퍼스 빌드 시각), `chat_model`(가이드를 쓴 LLM).
+  `data/rag/corpus_meta.json`에서 읽으며 코퍼스 미구축이면 값이 전부 `null`
 - `/drift-status`, `/reload-model`, `/start-shadow`, `/stop-shadow`: 자동 재학습
   루프용(§2-7). 감시 워커가 호출하며 사람이 직접 쓸 일은 거의 없음
 
@@ -162,7 +165,8 @@ cd 02-cnc-machining
 uv run --env-file .env python rag/build_corpus.py
 ```
 
-`data/rag/corpus.json`, `data/rag/corpus.index`가 생성됨(`data/` 하위라 git엔
+`data/rag/corpus.json`, `data/rag/corpus.index`, `data/rag/corpus_meta.json`(플레이북
+해시·빌드 시각 — `/predict`의 `versions`가 읽음)이 생성됨(`data/` 하위라 git엔
 안 올라감 — 서버 기동 전에 다른 PC에서도 한 번 돌려야 함). 코퍼스 소스
 문서(`rag/sources/*.md`)를 바꾸지 않는 한 다시 돌릴 필요 없음(플레이북 항목을
 더하거나 고치면 다시 돌린다).

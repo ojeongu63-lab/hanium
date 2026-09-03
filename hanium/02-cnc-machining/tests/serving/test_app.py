@@ -375,3 +375,34 @@ def test_predict_succeeds_even_if_shadow_inference_fails(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 200
+
+
+def test_predict_response_includes_versions_object(tmp_path, monkeypatch):
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    monkeypatch.delenv("OPENAI_CHAT_MODEL", raising=False)
+    np.random.seed(0)
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+    client = TestClient(app)
+
+    body = client.post(
+        "/predict",
+        files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    ).json()
+
+    assert body["versions"] == {"playbook": None, "corpus": None, "chat_model": None}
+
+    state = _fake_state(window_size=6)
+    state.rag_versions = {"playbook": "abcd1234", "built_at": "2026-09-03T12:05+09:00", "chunks": 42}
+    state.openai_client = object()  # rag_corpus가 없으므로 실제 호출은 일어나지 않는다
+    app.dependency_overrides[get_model_state] = lambda: state
+    np.random.seed(0)
+    body = client.post(
+        "/predict",
+        files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+    ).json()
+
+    assert body["versions"] == {
+        "playbook": "abcd1234", "corpus": "2026-09-03T12:05+09:00", "chat_model": "gpt-4o-mini",
+    }

@@ -4,6 +4,8 @@
 OpenAI 키 없이도 돈다. 임베딩은 guide.py가 확정 판정에서 Sandvik 청크를 고를 때만 쓴다.
 """
 
+import hashlib
+
 PLAYBOOK_SOURCE = "playbook"
 PLAYBOOK_META = {
     "title": "팀 시나리오 플레이북(자체 작성)",
@@ -17,6 +19,12 @@ SECTION_CATEGORY = {
 }
 SIGNATURE_PREFIX = "관련 센서:"
 HEADING_SEPARATOR = " — "
+
+
+def playbook_version(text: str) -> str:
+    """플레이북 문서 내용의 sha256 앞 8자리. 코퍼스 빌드 시 corpus_meta.json에 기록되고
+    /predict 응답의 versions.playbook 으로 나간다."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
 
 
 def _parse_signature(value: str, heading: str, known_features: set[str] | None) -> list[str]:

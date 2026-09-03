@@ -229,28 +229,29 @@
     "top_z": 12418.6962890625
   },
   "guide": {
-    "cause_estimate": "공구 마모가 원인일 가능성이 있습니다.",
-    "confidence_note": "센서 서명 일치가 0.80으로 나타나므로, 이러한 판단이 맞을 확률이 높습니다.",
+    "cause_estimate": "공구 마모로 추정됩니다.",
+    "confidence_note": "센서 신호의 통계적 분석에 기반하여 판단한 것으로, 원인 확정을 위한 추가 확인이 필요합니다.",
     "recommended_actions": [
-      "공구의 마모 상태를 확인하고, 필요시 교체합니다.",
-      "절삭 속도를 낮춰 공구 수명을 연장합니다.",
-      "공구 교체 후 스핀들 부하가 기준선으로 돌아오는지 모니터링합니다."
+      "인서트의 마모 상태를 확인합니다.",
+      "가공물의 조도 및 품질을 점검합니다.",
+      "센서 신호의 변화를 모니터링합니다."
     ],
     "safety_notes": [
-      "작업 중에는 기계의 안전 장치가 작동해 있는지 확인해야 합니다.",
-      "정비 작업 시 기계가 에너지원으로부터 안전하게 격리되어야 합니다."
+      "작업자는 기계가 정지된 상태에서 점검을 수행해야 합니다.",
+      "에너지 통제 절차를 준수하여 안전을 확보해야 합니다."
     ],
     "sources": [
       {
         "title": "팀 시나리오 플레이북(자체 작성)",
         "url": "rag/sources/scenario_playbook.md"
-      },
-      {
-        "title": "OSHA Machine Guarding & Lockout/Tagout",
-        "url": "https://www.osha.gov/etools/machine-guarding/introduction/general-requirements"
       }
     ]
   },
   "model_version": "1",
-  "mlflow_run_id": "56635df9337b486999f5ce135e1da466"
+  "mlflow_run_id": "56635df9337b486999f5ce135e1da466",
+  "versions": {
+    "playbook": "1c280cae",
+    "corpus": "2026-09-03T14:55+09:00",
+    "chat_model": "gpt-4o-mini"
+  }
 }
