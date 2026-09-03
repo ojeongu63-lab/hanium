@@ -206,6 +206,25 @@
       "z_score": -1.668982744216919
     }
   ],
+  "fault": {
+    "verdict": "none",
+    "verdict_ko": "이상 없음",
+    "situation": null,
+    "category": null,
+    "coverage": 0.0,
+    "matched_features": [],
+    "alternatives": [],
+    "other_group": null,
+    "top_z": null
+  },
+  "guide": {
+    "cause_estimate": "이상 없음",
+    "confidence_note": null,
+    "recommended_actions": [],
+    "safety_notes": [],
+    "sources": []
+  },
   "final_amplitude": 0.05,
-  "attempts": 2
+  "attempts": 2,
+  "final_ratio": 0.883
 }
