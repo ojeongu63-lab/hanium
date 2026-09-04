@@ -296,9 +296,13 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 
 ### 2-9. 미팅 데모 화면
 
-모델 판정 → 센서 근거 → 플레이북 대조 → 조치 가이드(탭 1)와 시나리오 3종 40일
-타임라인 + 재학습 루프 이벤트(탭 2)를 한 페이지로 보여 준다. 실제 결과가 파일 안에
-내장돼 있어 **서버 없이도 열린다.**
+모델 판정 → 센서 근거 → 플레이북 대조 → 조치 가이드(탭 1), 시나리오 3종 40일
+타임라인 + 재학습 루프 이벤트(탭 2), 그리고 그 기록을 하루씩 재생하는 **시뮬레이션**(탭 3:
+왼쪽 그래프·이벤트 로그가 흘러가고 오른쪽에 그날 불량 배치의 센서 → 플레이북 → 가이드가
+열린다)을 한 페이지로 보여 준다. 실제 결과가 파일 안에 내장돼 있어 **서버 없이도 열린다.**
+시뮬레이션의 가이드 문장은 같은 상황·판정의 배치에서 미리 생성한 "대표 가이드"이고,
+서버로 열면 "이 배치 지금 계산" 버튼이 실제 `/predict`를 호출해 LLM이 방금 쓴 가이드로
+바뀐다(RAG 실시간 연결 시연 지점, 5~10초).
 
 **기록 모드 (pull만 받은 PC):** `demo/index.html`을 브라우저로 연다. 끝.
 
@@ -316,7 +320,9 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 5. 미팅 전 점검: 예시 하나를 다시 계산해 가이드가 오는지와 소요 시간(몇 초).
 
 페이지 다시 만들기(재료가 바뀐 경우, 워커 로그가 있는 회사 PC에서):
-`uv run python demo/build_demo.py` → `demo/index.html`을 커밋.
+`uv run python demo/build_demo.py` → `demo/index.html`을 커밋. 대표 가이드까지 새로 만들려면
+`uv run --env-file .env python demo/build_demo.py --representative`(OpenAI 호출 13회,
+`data/rag/demo_guides.json` 갱신). 재생 엔진 단위 테스트는 `node demo/test_sim.mjs`.
 
 ## 3. WSL에서 Windows 브라우저로 접속이 안 될 때
 

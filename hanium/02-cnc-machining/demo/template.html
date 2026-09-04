@@ -68,7 +68,31 @@
   .event.shadow_started, .event.shadow_ended { border-color:#8e24aa; }
   .note { color:var(--muted); font-size:12px; }
   .error { color:var(--bad); font-size:13px; }
-  @media (max-width:900px) { #tab-batch { grid-template-columns:1fr; } }
+  #tab-sim { display:grid; grid-template-columns:3fr 2fr; gap:16px; }
+  #sim-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; font-size:13px; }
+  #sim-controls button { padding:6px 12px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; font-size:13px; }
+  #sim-controls button.active, #sim-controls button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #sim-controls select { padding:5px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px; }
+  #sim-day { font-weight:700; font-size:15px; min-width:120px; }
+  #sim-monitor { display:flex; gap:12px; font-size:12px; color:var(--muted); margin:6px 0; flex-wrap:wrap; }
+  #sim-monitor b { color:var(--text); }
+  #sim-chart svg { width:100%; height:auto; display:block; background:#fff; border:1px solid var(--line); border-radius:10px; }
+  #sim-log { margin-top:10px; max-height:300px; overflow-y:auto; background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:12px; }
+  #sim-log .line { padding:2px 0; color:var(--muted); border-bottom:1px dashed #eee; }
+  #sim-log .line b { color:var(--text); }
+  #sim-log .event { margin:6px 0; }
+  #sim-log .event.flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { from { background:#fff3cd; } to { background:#f7f9fc; } }
+  #sim-panel .chips { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 10px; }
+  #sim-panel .chip { padding:4px 10px; border-radius:12px; font-size:12px; cursor:pointer; border:2px solid transparent; color:#fff; background:var(--ok); }
+  #sim-panel .chip.bad { background:var(--bad); }
+  #sim-panel .chip.confirmed { background:var(--confirmed); } #sim-panel .chip.composite { background:var(--composite); }
+  #sim-panel .chip.weak { background:var(--weak); color:#333; } #sim-panel .chip.unknown { background:var(--unknown); }
+  #sim-panel .chip.active { border-color:#1f2430; box-shadow:0 0 0 2px #fff inset; }
+  #sim-panel .card { margin-bottom:10px; }
+  #sim-panel .card.flash { animation: flash 1.2s ease-out; }
+  #sim-live-msg { font-size:12px; color:var(--muted); margin-top:6px; white-space:pre-wrap; }
+  @media (max-width:900px) { #tab-batch, #tab-sim { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -81,6 +105,7 @@
 <nav class="tabs">
   <button data-tab="batch" class="active">배치 진단 흐름</button>
   <button data-tab="timeline">시나리오 타임라인</button>
+  <button data-tab="sim">시뮬레이션</button>
 </nav>
 <main>
   <section id="tab-batch">
@@ -109,8 +134,31 @@
     <div id="day-detail"><p class="note">그래프나 띠에서 날짜를 클릭하면 그날 배치 5개와 이벤트가 나옵니다.</p></div>
     <p class="note">판정은 champion v1 기준 오프라인 계산(rag/eval_playbook.py), 이벤트는 2026-09-02 라이브 워커 로그. 온도 시나리오는 Day 64 승격 뒤 실제 운영에서는 새 champion이 판정한다.</p>
   </section>
+  <section id="tab-sim" hidden>
+    <div>
+      <div id="sim-controls">
+        <span id="sim-scenarios"></span>
+        <button id="sim-play" class="primary">▶ 재생</button>
+        <button id="sim-step">⏭ 하루</button>
+        <button id="sim-reset">⏮ 처음</button>
+        <label>속도 <select id="sim-speed"><option value="0.5">0.5 s/일</option><option value="1" selected>1 s/일</option><option value="2">2 s/일</option><option value="4">4 s/일</option></select></label>
+        <label><input type="checkbox" id="sim-pause-events" checked> 이벤트에서 자동 정지</label>
+        <span id="sim-day">Day 0 / 0</span>
+      </div>
+      <div id="sim-monitor"></div>
+      <div id="sim-chart"></div>
+      <div id="sim-log"></div>
+      <p class="note">2026-09-02 실제 실행 기록의 재생 — 판정은 champion v1 오프라인 계산, 이벤트는 워커 로그. 재학습·게이트는 이 자리에서 다시 돌지 않는다.</p>
+    </div>
+    <div id="sim-panel">
+      <div class="card"><h3>현재 배치 진단</h3><p class="note">재생을 시작하면 그날 배치 5개가 여기 나오고, 불량 판정 배치의 센서 → 플레이북 대조 → 조치 가이드가 펼쳐집니다.</p></div>
+    </div>
+  </section>
 </main>
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
+<script>
+__SIM_ENGINE__
+</script>
 <script>
 (function () {
   const DATA = JSON.parse(document.getElementById('demo-data').textContent);
@@ -124,6 +172,7 @@
     document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x === b));
     $('#tab-batch').hidden = b.dataset.tab !== 'batch';
     $('#tab-timeline').hidden = b.dataset.tab !== 'timeline';
+    $('#tab-sim').hidden = b.dataset.tab !== 'sim';
   }));
   $('#generated').textContent = `생성 ${DATA.generated_at} · 플레이북 ${(DATA.versions && DATA.versions.playbook) || '-'}`;
 
@@ -349,11 +398,159 @@
     $('#day-detail').innerHTML = h;
   }
 
+  // ---------- 탭 3: 시뮬레이션 (재생) ----------
+  const sim = { scenario: null, st: SimEngine.initialState(), timer: null, selected: 0, liveResult: null };
+  function simScenario() { return DATA.scenarios[sim.scenario]; }
+  function renderSimScenarioButtons() {
+    const box = $('#sim-scenarios'); box.innerHTML = '';
+    Object.entries(DATA.scenarios).forEach(([name, sc]) => {
+      const b = document.createElement('button'); b.textContent = sc.label.split(' — ')[0]; b.dataset.name = name; b.title = sc.label;
+      b.addEventListener('click', () => simLoad(name)); box.appendChild(b);
+    });
+  }
+  function simLoad(name) {
+    simStop();
+    sim.scenario = name; sim.st = SimEngine.initialState($('#sim-pause-events').checked, Number($('#sim-speed').value)); sim.selected = 0; sim.liveResult = null;
+    document.querySelectorAll('#sim-scenarios button').forEach((b) => b.classList.toggle('active', b.dataset.name === name));
+    $('#sim-log').innerHTML = `<div class="line"><b>${esc(simScenario().label)}</b> · ${simScenario().days_total}일 · 이벤트 ${simScenario().events.length}건 · 재생을 누르면 하루씩 진행됩니다.</div>`;
+    simRender();
+  }
+  function simStop() { if (sim.timer) { clearInterval(sim.timer); sim.timer = null; } sim.st = { ...sim.st, playing: false }; $('#sim-play').textContent = '▶ 재생'; }
+  function simTick() {
+    const r = SimEngine.step(sim.st, simScenario());
+    sim.st = r.state;
+    if (r.reached) { simAppendLog(r.reached); sim.selected = SimEngine.firstBadIndex(r.reached); sim.liveResult = null; }
+    simRender();
+    if (r.stoppedBy) { simStop(); if (r.stoppedBy === 'event') $('#sim-log').lastElementChild && $('#sim-log').lastElementChild.classList.add('flash'); }
+  }
+  function simPlay() {
+    if (!sim.scenario) return;
+    if (sim.st.day >= simScenario().days_total) { sim.st = { ...sim.st, day: 0 }; $('#sim-log').innerHTML = ''; }
+    sim.st = { ...sim.st, playing: true, pauseOnEvent: $('#sim-pause-events').checked };
+    $('#sim-play').textContent = '❚❚ 일시정지';
+    simTick();
+    if (sim.st.playing) sim.timer = setInterval(() => { if (!sim.st.playing) { simStop(); return; } simTick(); }, Number($('#sim-speed').value) * 1000);
+  }
+  $('#sim-play').addEventListener('click', () => { if (sim.st.playing) simStop(); else simPlay(); });
+  $('#sim-step').addEventListener('click', () => { if (!sim.scenario) return; simStop(); sim.st = { ...sim.st, pauseOnEvent: $('#sim-pause-events').checked }; simTick(); });
+  $('#sim-reset').addEventListener('click', () => { if (sim.scenario) simLoad(sim.scenario); });
+  $('#sim-speed').addEventListener('change', () => { if (sim.st.playing) { simStop(); simPlay(); } });
+  $('#sim-pause-events').addEventListener('change', (ev) => { sim.st = { ...sim.st, pauseOnEvent: ev.target.checked }; });
+
+  function simAppendLog(d) {
+    const log = $('#sim-log');
+    const nBad = d.batches.filter((b) => b.pred === 'bad').length;
+    const kinds = {};
+    d.batches.filter((b) => b.pred === 'bad').forEach((b) => { kinds[b.verdict_ko] = (kinds[b.verdict_ko] || 0) + 1; });
+    const kindText = Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join(', ');
+    log.insertAdjacentHTML('beforeend', `<div class="line"><b>Day ${d.day}</b> · 불량 판정 ${nBad}/5${kindText ? ` (${kindText})` : ''} · 평균 배율 ${d.ratio_mean.toFixed(2)} · 실제 라벨 ${d.truth === 'bad' ? '불량' : '정상'}</div>`);
+    SimEngine.eventsOn(simScenario(), d.day).forEach((e) => {
+      let h = `<div class="event ${e.kind}"><b>${MARK[e.kind] || '•'} ${esc(e.text)}</b>`;
+      if (e.gate) h += `<div class="meta">게이트: ${esc(e.gate)}</div>`;
+      if (e.reason) h += `<div>사유: ${esc(e.reason)}</div>`;
+      if (e.cause) h += `<div>추정 원인: <b>${esc(e.cause)}</b> · 권장 조치: ${esc(e.actions)}</div>`;
+      log.insertAdjacentHTML('beforeend', h + '</div>');
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function simRender() {
+    const sc = simScenario(); if (!sc) return;
+    const day = sim.st.day, n = sc.days_total;
+    $('#sim-day').textContent = `Day ${day} / ${n}`;
+    const k = day ? SimEngine.consecutiveFlagged(sc, day) : 0;
+    const passed = sc.events.filter((e) => e.day <= day);
+    const counts = {};
+    passed.forEach((e) => { counts[e.kind] = (counts[e.kind] || 0) + 1; });
+    $('#sim-monitor').innerHTML = `<span>드리프트 감시 창(최근 10건) · 연속 감지 <b>${Math.min(k, 3)}/3</b>${k >= 3 ? ' → 트리거 조건' : ''}</span>
+      <span>트리거 <b>${counts.trigger || 0}</b> · 거부 <b>${counts.rejected || 0}</b> · 섀도우 <b>${counts.shadow_started || 0}</b> · 승격 <b>${counts.promoted || 0}</b></span>
+      <span>${sc.fault_from_day ? (day >= sc.fault_from_day ? '<b style="color:#c62828">실제 불량 구간</b>' : `실제 불량은 Day ${sc.fault_from_day}부터`) : '실제 라벨은 전부 정상'}</span>`;
+    // 그래프: 전체 일수 좌표계, 현재 날짜까지만 그린다
+    const W = 960, H = 260, L = 44, R = 12, T = 16, B = 28, cw = (W - L - R) / n;
+    const ymax = Math.max(2, ...sc.days.flatMap((d) => d.batches.map((b) => b.ratio))) * 1.05;
+    const x = (dd) => L + (dd - 0.5) * cw, y = (v) => T + (1 - v / ymax) * (H - T - B);
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    if (sc.fault_from_day) s += `<rect x="${x(sc.fault_from_day) - cw / 2}" y="${T}" width="${W - R - x(sc.fault_from_day) + cw / 2}" height="${H - T - B}" fill="#fdecea"/>`;
+    if (day >= 1) { const w0 = Math.max(1, day - 1); s += `<rect x="${x(w0) - cw / 2}" y="${T}" width="${x(day) - x(w0) + cw}" height="${H - T - B}" fill="#e8effa" opacity="0.7"/>`; }
+    for (let v = 0; v <= ymax; v += 0.5) s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#eee"/><text x="${L - 6}" y="${y(v) + 4}" font-size="10" text-anchor="end" fill="#888">${v.toFixed(1)}</text>`;
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(1)}" y2="${y(1)}" stroke="#333" stroke-dasharray="4 3"/>`;
+    sc.days.forEach((d) => { if (d.day % 5 === 0 || d.day === 1) s += `<text x="${x(d.day)}" y="${H - 8}" font-size="10" text-anchor="middle" fill="#888">D${d.day}</text>`; });
+    const shown = sc.days.slice(0, day);
+    shown.forEach((d) => d.batches.forEach((b) => { s += `<circle cx="${x(d.day)}" cy="${y(b.ratio)}" r="2.5" fill="${b.pred === 'bad' ? (COLORS[b.verdict] || '#c62828') : '#9ccc9c'}" opacity="0.85"/>`; }));
+    if (shown.length) s += `<polyline fill="none" stroke="#1e56a0" stroke-width="2" points="${shown.map((d) => `${x(d.day)},${y(d.ratio_mean)}`).join(' ')}"/>`;
+    passed.forEach((ev) => { const col = MARK_COLOR[ev.kind] || '#999'; s += `<line x1="${x(ev.day)}" x2="${x(ev.day)}" y1="${T}" y2="${H - B}" stroke="${col}" opacity="0.5"/><text x="${x(ev.day)}" y="${T + 12}" font-size="12" text-anchor="middle" fill="${col}">${MARK[ev.kind] || '•'}</text>`; });
+    if (day >= 1) s += `<line x1="${x(day)}" x2="${x(day)}" y1="${T}" y2="${H - B}" stroke="#1f2430" stroke-width="2"/>`;
+    s += '</svg>';
+    $('#sim-chart').innerHTML = s;
+    simRenderPanel();
+  }
+
+  function simRenderPanel() {
+    const sc = simScenario(), day = sim.st.day, panel = $('#sim-panel');
+    if (!day) { panel.innerHTML = '<div class="card"><h3>현재 배치 진단</h3><p class="note">재생을 시작하면 그날 배치 5개가 여기 나오고, 불량 판정 배치의 센서 → 플레이북 대조 → 조치 가이드가 펼쳐집니다.</p></div>'; return; }
+    const d = sc.days[day - 1], b = d.batches[sim.selected];
+    const chips = d.batches.map((bb, i) => `<span class="chip ${bb.pred === 'bad' ? bb.verdict : ''} ${i === sim.selected ? 'active' : ''}" data-i="${i}">${String(day).padStart(2, '0')}_${bb.index} · ${bb.ratio.toFixed(2)}${bb.pred === 'bad' ? ' · ' + esc(bb.verdict_ko) : ''}</span>`).join('');
+    let h = `<div class="card"><h3>Day ${day} 배치 <span class="meta">클릭해서 배치 전환</span></h3><div class="chips">${chips}</div>`;
+    if (state.live) h += `<button id="sim-live" class="primary">이 배치 지금 계산 (실제 /predict + LLM 가이드)</button><div id="sim-live-msg"></div>`;
+    h += '</div>';
+    const live = sim.liveResult && sim.liveResult.day === day && sim.liveResult.index === b.index ? sim.liveResult.body : null;
+    const ratio = live ? live.score / live.threshold : b.ratio, isBad = live ? live.predicted_label_text === 'bad' : b.pred === 'bad';
+    const contribs = live ? live.feature_contributions : (b.top10 || []).map(([f, z]) => ({ feature: f, z_score: z }));
+    const fault = live ? live.fault : (isBad ? { verdict: b.verdict, verdict_ko: b.verdict_ko, situation: b.situation, category: null, coverage: b.coverage, matched_features: b.matched || [], alternatives: b.alternatives || [], other_group: b.other_group || null, top_z: b.top_z } : null);
+    const scale = Math.max(4, ratio);
+    h += `<div class="card ${live ? 'flash' : ''}"><h3>1. 판정 <span class="meta">${live ? `실시간 · ${sim.liveResult.elapsed}s` : '기록'}</span></h3>
+      <p><span class="pill ${isBad ? 'bad' : 'good'}">${isBad ? '불량' : '정상'}</span> &nbsp; 기준 대비 배율 <b>${fmt(ratio)}</b>${live ? ` · 점수 ${fmt(live.score, 3)} / 기준 ${fmt(live.threshold, 4)}` : ''}</p>
+      <div class="bar ratio"><span style="width:${Math.min(100, ratio / scale * 100)}%"></span><i class="th" style="left:${(1 / scale) * 100}%"></i></div></div>`;
+    const top5 = contribs.slice(0, 5), maxZ = Math.max(1e-9, ...top5.map((c) => c.z_score));
+    h += `<div class="card contrib"><h3>2. 센서 기여도 <span class="meta">상위 5 (대조 범위)</span></h3>${top5.map((c, i) => `<div class="row top5"><span>${i + 1}. ${esc(c.feature)}</span><div class="bar"><span style="width:${Math.max(1, c.z_score / maxZ * 100)}%"></span></div><span class="num">${fmt(c.z_score, 1)}</span></div>`).join('') || '<p class="meta">-</p>'}</div>`;
+    if (isBad && fault) {
+      let rows = '', lastCat = null;
+      DATA.playbook.forEach((p) => {
+        if (p.category_ko !== lastCat) { rows += `<tr class="group"><td colspan="3">${esc(p.category_ko)}</td></tr>`; lastCat = p.category_ko; }
+        const cov = coverage(p.signature, contribs);
+        const isSel = p.name === fault.situation, isAlt = (fault.alternatives || []).includes(p.name), isOther = !!(fault.other_group && p.name === fault.other_group.situation);
+        const cls = isSel ? 'selected' : isAlt ? 'alt' : isOther ? 'other' : '';
+        rows += `<tr class="${cls}"><td>${esc(p.name)}${isSel ? ' ← 선택' : isAlt ? ' (후보)' : isOther ? ' (다른 구역 1위)' : ''}</td><td><div class="bar"><span style="width:${cov * 100}%"></span></div></td><td class="num">${fmt(cov)}</td></tr>`;
+      });
+      h += `<div class="card"><h3>3. 플레이북 대조</h3><table><tbody>${rows}</tbody></table></div>`;
+      h += `<div class="card"><h3>4. 센서 패턴 진단 <span class="meta">고장 원인의 확정이 아님</span></h3><p><span class="pill ${fault.verdict}">${esc(fault.verdict_ko)}</span> &nbsp; <b>${esc(fault.situation || '')}</b></p><p class="reason">${esc(reasonText(fault))}</p></div>`;
+      const guideEntry = live ? { guide: live.guide, versions: live.versions } : (sc.guides || {})[b.guide_key];
+      if (guideEntry && guideEntry.guide) {
+        const g = guideEntry.guide, list = (arr) => `<ul class="actions">${(arr || []).map((a) => `<li>${esc(a)}</li>`).join('') || '<li>-</li>'}</ul>`;
+        h += `<div class="card ${live ? 'flash' : ''}"><h3>5. 조치 가이드 <span class="meta">${live ? `방금 LLM이 작성 · ${esc((live.versions || {}).chat_model || '')}` : `대표 가이드 — 같은 상황·판정의 배치(day${String(guideEntry.day).padStart(2, '0')}_${guideEntry.index})에서 생성`}</span></h3>
+          <div class="kv"><span>원인 추정</span><span>${esc(g.cause_estimate)}</span><span>확신도</span><span>${esc(g.confidence_note || '-')}</span><span>권장 조치</span><span>${list(g.recommended_actions)}</span><span>안전 수칙</span><span>${list(g.safety_notes)}</span><span>출처</span><span>${(g.sources || []).map((x) => esc(x.title)).join(' · ') || '-'}</span></div></div>`;
+      } else {
+        h += `<div class="card"><h3>5. 조치 가이드</h3><p class="meta">${live ? 'guide가 null — OpenAI 키 없음' : '대표 가이드 없음 — 서버 실시간으로 계산 가능'}</p></div>`;
+      }
+    } else {
+      h += `<div class="card"><h3>3~5. 플레이북 대조 · 진단 · 가이드</h3><p class="meta">정상 판정 배치 — 대조하지 않습니다. 불량 판정 칩을 고르면 진단이 펼쳐집니다.</p></div>`;
+    }
+    panel.innerHTML = h;
+    panel.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => { sim.selected = Number(c.dataset.i); sim.liveResult = null; simRenderPanel(); }));
+    const liveBtn = $('#sim-live');
+    if (liveBtn) liveBtn.addEventListener('click', async () => {
+      liveBtn.disabled = true; $('#sim-live-msg').textContent = '배치 생성 → /predict 호출 중…';
+      const t0 = performance.now();
+      try {
+        const r = await fetchWithTimeout(`/demo/timeline/${sim.scenario}/${day}/${b.index}`, {}, 30000);
+        if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(`배치 생성 ${r.status}: ${e.detail || ''}`); }
+        const fd = new FormData(); fd.append('file', await r.blob(), `${sim.scenario}_day${day}_${b.index}.csv`);
+        const p = await fetchWithTimeout('/predict', { method: 'POST', body: fd }, 90000);
+        const body = await p.json();
+        if (!p.ok) throw new Error(`HTTP ${p.status}: ${body.detail || ''}`);
+        sim.liveResult = { day, index: b.index, body, elapsed: ((performance.now() - t0) / 1000).toFixed(1) };
+        simRenderPanel();
+      } catch (e) { $('#sim-live-msg').innerHTML = `<span class="error">실패: ${esc(e.message || e)}</span>`; liveBtn.disabled = false; }
+    });
+  }
+
   renderExamples();
   if (DATA.examples.length) selectExample(DATA.examples[0].key);
   renderScenarioButtons();
   const firstScenario = Object.keys(DATA.scenarios)[0]; if (firstScenario) renderScenario(firstScenario);
-  detectLive();
+  renderSimScenarioButtons();
+  if (firstScenario) simLoad(firstScenario);
+  detectLive().then(() => { if (sim.scenario) simRenderPanel(); });
 })();
 </script>
 </body>

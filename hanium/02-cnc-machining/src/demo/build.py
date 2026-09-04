@@ -64,18 +64,45 @@ def parse_worker_log(text: str) -> list[dict]:
     return events
 
 
+def guide_key(situation: str | None, verdict: str) -> str:
+    """대표 가이드 조회 키 — 같은 상황·같은 판정의 배치는 같은 가이드를 공유한다."""
+    return f"{situation}|{verdict}"
+
+
 def _batch(row: dict) -> dict:
     fault = row["fault"]
     return {
         "index": row["index"], "ratio": round(row["ratio"], 3), "pred": row["pred"],
+        "score": row.get("score"), "threshold": row.get("threshold"),
         # 한글 문구는 기록 시점이 아니라 현재 VERDICT_KO를 따른다(문구가 바뀌어도 재채점 불필요)
         "verdict": fault["verdict"], "verdict_ko": VERDICT_KO.get(fault["verdict"], fault["verdict_ko"]),
         "situation": fault["situation"], "coverage": fault["coverage"], "top": row["top"],
+        # 시뮬레이션 탭의 진단 패널용(기여도 카드·플레이북 대조 표·근거 문장)
+        "top10": row.get("top10", row["top"]),
+        "matched": fault.get("matched_features", []),
+        "alternatives": fault.get("alternatives", []),
+        "other_group": fault.get("other_group"),
+        "top_z": fault.get("top_z"),
+        "guide_key": guide_key(fault["situation"], fault["verdict"]) if row["pred"] == "bad" else None,
     }
 
 
+def pick_representatives(timeline: dict) -> dict[str, dict[str, dict]]:
+    """시나리오마다 (상황, 판정) 조합별 첫 불량 배치 — 대표 가이드를 생성할 대상."""
+    picks: dict[str, dict[str, dict]] = {}
+    for scenario, block in timeline.items():
+        chosen: dict[str, dict] = {}
+        for row in sorted(block["rows"], key=lambda r: (r["day"], r["index"])):
+            if row["pred"] != "bad":
+                continue
+            key = guide_key(row["fault"]["situation"], row["fault"]["verdict"])
+            chosen.setdefault(key, {"day": row["day"], "index": row["index"]})
+        picks[scenario] = chosen
+    return picks
+
+
 def assemble(examples: list[dict], corpus: list[dict], eval_data: dict, worker_logs: dict[str, str],
-             versions: dict, generated_at: str) -> dict:
+             versions: dict, generated_at: str, guides: dict[str, dict] | None = None) -> dict:
     playbook = [
         {"name": c["name"], "heading": c["heading"], "category": c["fault_category"],
          "category_ko": CATEGORY_KO[c["fault_category"]], "signature": c["signature"], "text": c["text"]}
@@ -98,13 +125,15 @@ def assemble(examples: list[dict], corpus: list[dict], eval_data: dict, worker_l
             "label": SCENARIO_LABELS.get(name, name), "fault_from_day": FAULT_FROM_DAY.get(name),
             "days_total": len(days), "days": days,
             "events": parse_worker_log(worker_logs[name]) if worker_logs.get(name) else [],
+            "guides": (guides or {}).get(name, {}),
         }
     return {"generated_at": generated_at, "versions": versions, "playbook": playbook,
             "examples": examples, "scenarios": scenarios}
 
 
-def render_html(template: str, data: dict) -> str:
+def render_html(template: str, data: dict, engine_js: str = "") -> str:
     """JSON을 <script type="application/json"> 안에 넣는다. '</'는 '<\\/'로 바꿔 스크립트 태그가
-    일찍 닫히지 않게 한다(JSON에서 유효한 이스케이프)."""
+    일찍 닫히지 않게 한다(JSON에서 유효한 이스케이프). `__SIM_ENGINE__` 자리에는 재생 엔진
+    JS(demo/sim_engine.js)를 인라인한다 — 단일 파일로 열리게."""
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    return template.replace("__DEMO_DATA__", payload)
+    return template.replace("__DEMO_DATA__", payload).replace("__SIM_ENGINE__", engine_js)

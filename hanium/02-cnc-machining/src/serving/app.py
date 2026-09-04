@@ -14,7 +14,7 @@ import mlflow.pytorch
 import pandas as pd
 import torch
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from mlflow.tracking import MlflowClient
 from openai import OpenAI
 
@@ -282,6 +282,43 @@ def demo_input(key: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"입력 파일 없음: {path} (README §1-2 데이터 배치 확인)")
     return FileResponse(path, media_type="text/csv", filename=path.name)
+
+
+TIMELINE_SCENARIOS = ("temperature", "tool_wear", "fixture_loosening")
+TIMELINE_BATCHES_PER_DAY = 5
+
+
+def _generate_timeline_batch(day: int, index: int, scenario: str) -> pd.DataFrame:
+    """monitoring/simulate_timeline.py 의 generate_batch 를 그대로 쓴다(수정 금지 파일이라 import만).
+    monitoring/ 은 패키지가 아닌 최상위 스크립트 폴더라 sys.path 에 더한다 — rag/eval_playbook.py 와 같은 방식."""
+    import sys
+
+    monitoring_dir = str(ROOT / "monitoring")
+    if monitoring_dir not in sys.path:
+        sys.path.insert(0, monitoring_dir)
+    from simulate_timeline import generate_batch  # noqa: PLC0415
+
+    return generate_batch(day, index, scenario)
+
+
+@app.get("/demo/timeline/{scenario}/{day}/{index}")
+def demo_timeline_batch(scenario: str, day: int, index: int) -> Response:
+    """시뮬레이션 탭의 '이 배치 지금 계산'이 /predict에 올릴 타임라인 배치 CSV.
+    시뮬레이터와 같은 규칙으로 그 자리에서 만든다(원본 데이터셋이 있는 PC에서만 동작)."""
+    if scenario not in TIMELINE_SCENARIOS:
+        raise HTTPException(status_code=404, detail=f"모르는 시나리오 '{scenario}' — {TIMELINE_SCENARIOS}")
+    if day < 1 or not 0 <= index < TIMELINE_BATCHES_PER_DAY:
+        raise HTTPException(status_code=404, detail=f"day는 1 이상, index는 0~{TIMELINE_BATCHES_PER_DAY - 1}")
+    try:
+        df = _generate_timeline_batch(day, index, scenario)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail=f"원본 데이터셋 없음({exc}) — README §1-2 데이터 배치 확인"
+        ) from exc
+    return Response(
+        content=df.to_csv(index=False), media_type="text/csv",
+        headers={"Content-Disposition": f'inline; filename="{scenario}_day{day:02d}_{index}.csv"'},
+    )
 
 
 @app.post("/reload-model")

@@ -40,12 +40,20 @@ def test_parse_worker_log_extracts_events_with_days_gate_reason_and_cause():
 def _row(day, index, pred, verdict, situation, ratio):
     return {
         "day": day, "index": index, "truth": "good" if day < 21 else "bad", "pred": pred, "ratio": ratio,
+        "score": round(ratio * 0.8566, 4), "threshold": 0.8566,
         "top": [["S_OutputCurrent", 30.0], ["S_OutputPower", 5.0], ["S_CurrentFeedback", 4.0]],
+        "top10": [["S_OutputCurrent", 30.0], ["S_OutputPower", 5.0], ["S_CurrentFeedback", 4.0],
+                  ["S_DCBusVoltage", 3.0], ["S_SetVelocity", 2.5], ["X_OutputCurrent", 2.0],
+                  ["Y_OutputCurrent", 1.5], ["Z_ActualVelocity", 1.2], ["X_ActualVelocity", 1.0], ["Y_ActualVelocity", 0.9]],
         "fault": {
             "verdict": verdict, "verdict_ko": {"confirmed": "확정(옛 기록)", "none": "이상 없음"}[verdict],
             "situation": situation, "category": "tool_wear" if situation else None,
-            "coverage": 0.8 if situation else 0.0, "matched_features": [], "alternatives": [],
-            "other_group": None, "top_z": 30.0,
+            "coverage": 0.8 if situation else 0.0,
+            "matched_features": ["S_OutputCurrent", "S_OutputPower", "S_CurrentFeedback"] if situation else [],
+            "alternatives": ["공구 파손·치핑", "스핀들 베어링 손상"] if situation else [],
+            "other_group": ({"situation": "공구 돌출 과다·홀더 불량", "category": "vibration_backlash", "coverage": 0.22}
+                            if situation else None),
+            "top_z": 30.0,
         },
     }
 
@@ -75,6 +83,13 @@ def test_assemble_groups_days_and_builds_playbook_and_scenarios():
     # 채점 기록의 옛 verdict_ko("확정")를 쓰지 않고 현재 VERDICT_KO로 다시 붙인다
     assert sc["days"][0]["batches"][1]["verdict_ko"] == "높은 패턴 일치"
     assert sc["events"][0]["kind"] == "trigger"
+    bad = sc["days"][0]["batches"][1]
+    assert len(bad["top10"]) == 10 and bad["top10"][0] == ["S_OutputCurrent", 30.0]
+    assert bad["matched"] == ["S_OutputCurrent", "S_OutputPower", "S_CurrentFeedback"]
+    assert bad["alternatives"] == ["공구 파손·치핑", "스핀들 베어링 손상"]
+    assert bad["other_group"]["situation"] == "공구 돌출 과다·홀더 불량"
+    assert bad["top_z"] == 30.0 and bad["score"] > 0 and bad["threshold"] == 0.8566
+    assert sc["guides"] == {}
     assert data["examples"][0]["key"] == "tool_wear"
     assert data["versions"]["playbook"] == "abcd1234"
     assert data["generated_at"] == "2026-09-03T15:00+09:00"
@@ -97,3 +112,34 @@ def test_render_html_injects_json_and_escapes_script_close():
     start = html.index('application/json">') + len('application/json">')
     payload = html[start: html.index("</script>", start)]
     assert json.loads(payload) == data
+
+
+from demo.build import guide_key, pick_representatives
+
+
+def test_guide_key_and_pick_representatives_first_bad_batch_per_combo():
+    rows = [
+        _row(21, 0, "good", "none", None, 0.6),
+        _row(21, 1, "bad", "confirmed", "공구 마모", 1.4),
+        _row(22, 0, "bad", "confirmed", "공구 마모", 2.0),
+    ]
+    picks = pick_representatives({"tool_wear": {"rows": rows}})
+
+    assert guide_key("공구 마모", "confirmed") == "공구 마모|confirmed"
+    assert picks == {"tool_wear": {"공구 마모|confirmed": {"day": 21, "index": 1}}}
+
+
+def test_assemble_attaches_representative_guides_by_scenario():
+    eval_data = {"timeline": {"tool_wear": {"rows": [_row(21, 1, "bad", "confirmed", "공구 마모", 1.4)]}}}
+    guides = {"tool_wear": {"공구 마모|confirmed": {"day": 21, "index": 1, "guide": {"cause_estimate": "g"},
+                                                    "versions": {"chat_model": "gpt-4o-mini"}}}}
+
+    data = assemble([], [], eval_data, {}, {}, "t", guides=guides)
+
+    assert data["scenarios"]["tool_wear"]["guides"]["공구 마모|confirmed"]["guide"]["cause_estimate"] == "g"
+
+
+def test_render_html_inlines_sim_engine():
+    template = '<script>__SIM_ENGINE__</script><script id="demo-data" type="application/json">__DEMO_DATA__</script>'
+    html = render_html(template, {"a": 1}, engine_js="const SimEngine = 1;")
+    assert "const SimEngine = 1;" in html and "__SIM_ENGINE__" not in html

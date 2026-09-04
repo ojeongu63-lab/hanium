@@ -431,3 +431,40 @@ def test_demo_routes_serve_page_and_inputs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(app_module, "DEMO_INDEX", tmp_path / "absent.html")
     assert client.get("/demo").status_code == 404
+
+
+def test_demo_timeline_route_generates_batch_csv(monkeypatch):
+    import serving.app as app_module
+
+    calls = []
+
+    def fake_generate(day, index, scenario):
+        calls.append((day, index, scenario))
+        return pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+
+    monkeypatch.setattr(app_module, "_generate_timeline_batch", fake_generate)
+    client = TestClient(app)
+
+    got = client.get("/demo/timeline/tool_wear/21/0")
+    assert got.status_code == 200
+    assert got.headers["content-type"].startswith("text/csv")
+    assert got.text.splitlines()[0] == "a,b"
+    assert calls == [(21, 0, "tool_wear")]
+
+    assert client.get("/demo/timeline/nope/21/0").status_code == 404
+    assert client.get("/demo/timeline/tool_wear/0/0").status_code == 404
+    assert client.get("/demo/timeline/tool_wear/21/5").status_code == 404
+
+
+def test_demo_timeline_route_404_when_dataset_missing(monkeypatch):
+    import serving.app as app_module
+
+    def missing(day, index, scenario):
+        raise FileNotFoundError("experiment_01.csv")
+
+    monkeypatch.setattr(app_module, "_generate_timeline_batch", missing)
+    client = TestClient(app)
+
+    got = client.get("/demo/timeline/temperature/3/1")
+    assert got.status_code == 404
+    assert "데이터셋" in got.json()["detail"]
