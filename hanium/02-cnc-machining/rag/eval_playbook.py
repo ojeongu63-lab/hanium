@@ -74,6 +74,8 @@ def score_timeline(corpus: list[dict], state, scenarios: list[str], days: int) -
                     "pred": result["predicted_label_text"], "fault": result["fault"],
                     "ratio": round(result["score"] / result["threshold"], 4),
                     "top": [[c["feature"], round(c["z_score"], 1)] for c in result["feature_contributions"][:3]],
+                    "top10": [[c["feature"], round(c["z_score"], 1)] for c in result["feature_contributions"][:10]],
+                    "score": round(result["score"], 4), "threshold": round(result["threshold"], 4),
                 })
         print(f"\n### {scenario} (champion v{state.model_version})")
         summary = {}
