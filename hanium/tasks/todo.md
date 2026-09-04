@@ -565,3 +565,18 @@ pull 받아 미팅하되 실시간까지 준비.
 
 **배운 것**: 서버 기동 줄과 `pkill -f '<패턴>'`을 같은 명령 문자열에 넣으면 패턴이 셸
 자신과 일치해 셸이 죽는다(exit 144). 종료는 PID 파일이나 별도 명령으로 — `tasks/lessons.md`.
+
+## 미팅 데모 — 시뮬레이션 탭 (2026-09-03 저녁)
+
+사용자 요청: 정적 화면보다 MLOps 루프와 RAG 연결을 동적 시뮬레이션으로. 결정: 재생 모드
+(09-02 실행 기록을 하루 단위로 재생, 재학습은 그 자리에서 안 돌림) + 좌우 분할 + "이 배치
+지금 계산"으로 RAG 실시간 연결 시연. 스펙 `02-cnc-machining/docs/specs/2026-09-03-cnc-demo-simulation-design.md`.
+
+- [x] Sim 1 채점 기록 top10 추가·재실행, `_batch` 확장, `guide_key`·`pick_representatives`, `guides` 조립
+- [x] Sim 2 대표 가이드 13개 생성(`build_demo.py --representative` → `data/rag/demo_guides.json`)
+- [x] Sim 3 `/demo/timeline/{scenario}/{day}/{index}` + 테스트 2개
+- [x] Sim 4 탭 3(재생 엔진 `demo/sim_engine.js` + `node demo/test_sim.mjs`, 그래프, 이벤트 로그, 진단 패널, 지금 계산)
+- [x] Sim 5 서버 검증(타임라인 배치 → /predict 5.1초), README·STRUCTURE·스펙 정정, push
+
+테스트 211개 + node 1개 통과. `demo/index.html` 685KB. 남은 일: 사용자가 브라우저에서
+시뮬레이션 탭 재생·이벤트 정지·칩 전환·지금 계산을 눈으로 확인, 개인 PC 리허설.
