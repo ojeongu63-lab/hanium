@@ -1,6 +1,7 @@
 """src/config.py — 환경변수가 없으면 코드에 박혀 있던 값, 있으면 그 값. 파싱 실패는 즉시 죽는다."""
 import importlib
 import os
+from pathlib import Path
 
 import pytest
 
@@ -113,3 +114,37 @@ def test_src_modules_follow_config(tmp_path):
     assert got["drift_window"] == 4
     assert got["batches_per_day"] == 2
     assert got["epochs"] == 1
+
+
+MONITORING_DIR = str(Path(__file__).resolve().parent.parent / "monitoring")
+
+FEEDER_WIRING = f"""
+import json, sys
+sys.path.insert(0, {MONITORING_DIR!r})
+import simulate_timeline as st
+print(json.dumps({{
+    "labels_db": str(st.LABELS_DB),
+    "dataset_dir": str(st.DATASET_DIR),
+    "pos_drift": st.POS_DRIFT,
+    "flip": st.WEAR_LABEL_FLIP_DAY,
+    "progress_9": st.progress_for(9),
+}}))
+"""
+
+
+def test_feeder_follows_config(tmp_path):
+    got = _run_snippet(FEEDER_WIRING, {
+        "CNC_DATA_ROOT": str(tmp_path),
+        "CNC_POS_DRIFT": "8",
+        "CNC_LABEL_FLIP_DAY": "3",
+        "CNC_DRIFT_START_DAY": "2",
+        "CNC_TOTAL_DAYS": "3",
+        "CNC_DRIFT_MAX_PROGRESS": "1.0",
+    })
+
+    root = str(tmp_path)
+    assert got["labels_db"] == f"{root}/monitoring/labels.db"
+    assert got["dataset_dir"] == f"{root}/dataset/CNC 비식별화 원본데이터_1209/CNC Virtual Data set _v2"
+    assert got["pos_drift"] == 8.0
+    assert got["flip"] == 3
+    assert got["progress_9"] == 1.0

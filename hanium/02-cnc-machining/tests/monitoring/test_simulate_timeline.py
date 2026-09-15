@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "monitoring"))
 
 from simulate_timeline import apply_fixture_loosening  # noqa: E402
+import simulate_timeline as st  # noqa: E402
 
 
 def _position_df(n=200):
@@ -42,3 +43,38 @@ def test_apply_fixture_loosening_keeps_mean_but_increases_spread():
     for col in df.columns:
         assert out[col].mean() == pytest.approx(df[col].mean(), abs=df[col].std() * 0.5)
         assert out[col].std() > df[col].std()
+
+
+def test_progress_is_unbounded_without_cap(monkeypatch):
+    monkeypatch.setattr(st, "DRIFT_START_DAY", 10)
+    monkeypatch.setattr(st, "TOTAL_DAYS", 40)
+    monkeypatch.setattr(st, "DRIFT_MAX_PROGRESS", None)
+
+    assert st.progress_for(5) == 0.0
+    assert st.progress_for(40) == pytest.approx(1.0)
+    assert st.progress_for(70) == pytest.approx(2.0)  # 08-25 스펙의 알려진 한계 그대로
+
+
+def test_progress_is_capped_when_configured(monkeypatch):
+    monkeypatch.setattr(st, "DRIFT_START_DAY", 2)
+    monkeypatch.setattr(st, "TOTAL_DAYS", 3)
+    monkeypatch.setattr(st, "DRIFT_MAX_PROGRESS", 1.0)
+
+    assert st.progress_for(2) == 0.0
+    assert st.progress_for(3) == pytest.approx(1.0)
+    assert st.progress_for(9) == pytest.approx(1.0)  # 계단
+
+
+def test_serve_url_mode_feeds_only_requested_day_range(monkeypatch, tmp_path):
+    fed = []
+    monkeypatch.setattr(st, "feed_day", lambda client, day, scenario, out_dir: fed.append(day))
+    monkeypatch.setattr(st, "DATA_ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", [
+        "simulate_timeline.py", "temperature", "--serve-url", "http://127.0.0.1:1",
+        "--start-day", "5", "--days", "6",
+    ])
+
+    st.main()
+
+    assert fed == [5, 6]
+    assert (tmp_path / "timeline" / "temperature").is_dir()

@@ -21,22 +21,32 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from config import (  # noqa: E402
+    BATCHES_PER_DAY,
+    CUR_DRIFT,
+    DATA_ROOT,
+    DRIFT_MAX_PROGRESS,
+    DRIFT_START_DAY,
+    EXPERIMENT_DIR,
+    LABEL_DELAY_DAYS,
+    LABEL_FLIP_DAY,
+    POS_DRIFT,
+    TOTAL_DAYS,
+    VIBRATION_RATE,
+    WEAR_RATE,
+)
 from monitoring.labels import record_label  # noqa: E402
 from preprocessing.split import TRAIN_EXPERIMENT_IDS  # noqa: E402
 
-# monitoring/simulate_drift.py 와 동일한 경로 — 원본 CSV 는 두 단계 더 깊다.
-DATASET_DIR = (
-    ROOT / "data" / "dataset" / "CNC 비식별화 원본데이터_1209" / "CNC Virtual Data set _v2"
-)
-LABELS_DB = ROOT / "data" / "monitoring" / "labels.db"
+# 경로·상수·진폭은 config.py(환경변수 CNC_*)에서 온다. 기본값은 이 파일에 박혀 있던 값과 같다.
+# 변형 함수는 모듈 전역(POS_DRIFT 등)을 읽는다 — sweep_drift_constants.py 가 st.POS_DRIFT = v 로
+# 바꿔 가며 부르기 때문에 config.POS_DRIFT 를 직접 참조하면 안 된다.
+DATASET_DIR = EXPERIMENT_DIR
+LABELS_DB = DATA_ROOT / "monitoring" / "labels.db"
+WEAR_LABEL_FLIP_DAY = LABEL_FLIP_DAY       # 시나리오 B에서 QC 불합격이 시작되는 날
+VIBRATION_LABEL_FLIP_DAY = LABEL_FLIP_DAY  # 고정구 풀림도 같은 날부터
 
-TOTAL_DAYS = 40
-BATCHES_PER_DAY = 5
-DRIFT_START_DAY = 10          # Day 1~10 은 변형 없는 baseline 구간
-LABEL_DELAY_DAYS = 7
-WEAR_LABEL_FLIP_DAY = 21      # 시나리오 B에서 QC 불합격이 시작되는 날
-VIBRATION_LABEL_FLIP_DAY = 21  # WEAR_LABEL_FLIP_DAY 와 동일 — 고정구 풀림도 같은 날부터 QC 불합격 시작
-
+# 아래 값들(POS_DRIFT=0.02, CUR_DRIFT=0.02, WEAR_RATE=0.2, VIBRATION_RATE=3.65)의 근거 —
 # sweep_drift_constants.py 로 확정한 값. champion v1 (threshold 0.8566) 기준.
 # 목표 Day 40 score/threshold — temperature 1.5~2.0, tool_wear 3.0, fixture_loosening 3.0
 # (실측 대역: GOOD 0.43~1.30, BAD 1.00~3.79).
@@ -64,10 +74,6 @@ VIBRATION_LABEL_FLIP_DAY = 21  # WEAR_LABEL_FLIP_DAY 와 동일 — 고정구 �
 #
 # 모델이 재학습되면 이 상수는 낡는다. simulate_timeline 이 매일 실제 비율을
 # 출력하므로 조용히 틀리지는 않는다.
-POS_DRIFT = 0.02
-CUR_DRIFT = 0.02
-WEAR_RATE = 0.2
-VIBRATION_RATE = 3.65          # 가산 노이즈라 GRID 밖 — 위 주석 참고
 
 TEMP_POSITION_COLUMNS = ["X_ActualPosition", "Y_ActualPosition", "Z_ActualPosition"]
 TEMP_CURRENT_COLUMNS = [
@@ -84,7 +90,13 @@ VIBRATION_COLUMNS = [
 
 
 def progress_for(day: int) -> float:
-    return max(0.0, (day - DRIFT_START_DAY) / (TOTAL_DAYS - DRIFT_START_DAY))
+    """변형 진행도. DRIFT_START_DAY 이전 0, TOTAL_DAYS 에 1. 상한이 없으면 그 뒤로도 계속 커진다
+    (08-25 섀도우 스펙의 알려진 한계). CNC_DRIFT_MAX_PROGRESS 를 주면 거기서 멈춘다 — 통합 테스트는
+    1.0 으로 계단 변형을 만든다."""
+    progress = max(0.0, (day - DRIFT_START_DAY) / (TOTAL_DAYS - DRIFT_START_DAY))
+    if DRIFT_MAX_PROGRESS is not None:
+        progress = min(progress, DRIFT_MAX_PROGRESS)
+    return progress
 
 
 def apply_temperature(df: pd.DataFrame, progress: float) -> pd.DataFrame:
@@ -177,6 +189,10 @@ def main() -> None:
     parser.add_argument("scenario", choices=list(PERTURBATIONS))
     parser.add_argument("--days", type=int, default=TOTAL_DAYS)
     parser.add_argument(
+        "--start-day", type=int, default=1,
+        help="이 날부터 보낸다(기본 1). 통합 테스트가 하루씩 끊어 보낼 때 쓴다: --start-day N --days N",
+    )
+    parser.add_argument(
         "--serve-url",
         default=None,
         help="지정하면 이 주소의 실제 서버로 배치를 쏜다(진짜 HTTP, 별도 프로세스로 "
@@ -197,7 +213,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    out_dir = ROOT / "data" / "timeline" / args.scenario
+    out_dir = DATA_ROOT / "timeline" / args.scenario
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.serve_url:
@@ -206,7 +222,7 @@ def main() -> None:
         import httpx2
 
         with httpx2.Client(base_url=args.serve_url, timeout=30.0) as client:
-            for day in range(1, args.days + 1):
+            for day in range(args.start_day, args.days + 1):
                 feed_day(client, day, args.scenario, out_dir)
                 print(f"Day {day:02d}  {BATCHES_PER_DAY}개 배치 전송 완료", flush=True)
                 if args.pace_seconds:
@@ -223,7 +239,7 @@ def main() -> None:
     # with 블록이어야 lifespan 이 돌아 champion 모델이 로드된다
     # (simulate_drift.py 와 같은 관례). 없으면 /predict 가 503 을 낸다.
     with TestClient(app) as client:
-        for day in range(1, args.days + 1):
+        for day in range(args.start_day, args.days + 1):
             feed_day(client, day, args.scenario, out_dir)
 
             result = tick(client, state, current_day=day, scenario=args.scenario)
