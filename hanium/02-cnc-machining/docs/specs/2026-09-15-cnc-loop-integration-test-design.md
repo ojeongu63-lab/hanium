@@ -261,9 +261,10 @@ services:
 1. `uv run pytest -q` 통과, 통합 테스트는 수집만 되고 실행 안 됨(`deselected` 표시).
 2. `nice -n 19 uv run pytest -m integration -q` 이 서버에서 통과, 소요 시간 기록.
 3. GitHub Actions 세 job 녹색(main push 후 확인, 워크플로 링크를 정정 절에).
-4. 이 서버에서 `docker compose --profile demo up`으로 temperature를 5일치(`DAYS=5 PACE=2`)
-   돌려 워커 로그에 `Day 01`~`Day 05`가 찍히는지. 끝나면 `labels.db`·`requests.db`·
-   `data/timeline/temperature` 원상복구.
+4. docker가 있는 PC(개인 PC — 이 서버의 WSL에는 docker가 없다, 계획 작성 중 확인)에서
+   `docker compose --profile demo up`으로 temperature를 5일치(`DAYS=5 PACE=2`) 돌려 워커 로그에
+   `Day 01`~`Day 05`가 찍히는지. 끝나면 `labels.db`·`requests.db`·`data/timeline/temperature`
+   원상복구. 이 서버에서는 compose 파일의 YAML 파싱과 CI `docker-build` job으로 대신한다.
 5. 실데이터 경로 불변 확인: 환경변수 없이 세 터미널 방식으로 temperature 3일 스모크(트리거 없는
    구간) → 기존 08-24 스모크와 같은 `flagged=False`. DB·timeline 원상복구.
 6. 결과를 이 문서 "실행 결과에 따른 정정" 절에 적는다.
