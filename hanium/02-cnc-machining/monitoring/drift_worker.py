@@ -98,7 +98,7 @@ def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
         timeline_dir=ROOT / "data" / "timeline" / scenario,
         labels_db=LABELS_DB,
         current_day=current_day,
-        root=ROOT,
+        data_root=ROOT / "data",
     )
     state.cooldown_remaining = COOLDOWN_DAYS
 

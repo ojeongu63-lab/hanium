@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 
+from config import DATA_ROOT, DATASET_DIR, EXPERIMENT_DIR
 from preprocessing.pipeline import run_pipeline
 from preprocessing.split import (
     EVAL_BAD_EXPERIMENT_IDS,
@@ -8,15 +8,12 @@ from preprocessing.split import (
     TRAIN_EXPERIMENT_IDS,
 )
 
-ROOT = Path(__file__).resolve().parent.parent
-DATASET_DIR = ROOT / "data" / "dataset" / "CNC 비식별화 원본데이터_1209"
-
 
 def main() -> None:
     manifest = run_pipeline(
         experiment_index_path=str(DATASET_DIR / "train.csv"),
-        experiment_dir=str(DATASET_DIR / "CNC Virtual Data set _v2"),
-        output_dir=str(ROOT / "data" / "processed"),
+        experiment_dir=str(EXPERIMENT_DIR),
+        output_dir=str(DATA_ROOT / "processed"),
         train_experiment_ids=TRAIN_EXPERIMENT_IDS,
         eval_good_experiment_ids=EVAL_GOOD_EXPERIMENT_IDS,
         eval_bad_experiment_ids=EVAL_BAD_EXPERIMENT_IDS,

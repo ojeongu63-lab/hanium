@@ -6,6 +6,7 @@ import mlflow
 import mlflow.pytorch
 import pandas as pd
 
+from config import TRAIN_EPOCHS
 from lstm_ae.pipeline import run_lstm_pipeline
 from lstm_ae.tracking import REGISTERED_MODEL_NAME, build_run_metrics, configure_tracking
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
@@ -13,11 +14,12 @@ from preprocessing.scaling import fit_scaler, scaler_to_dict
 
 # scripts/run_lstm_training.py 의 TRAINING_CONFIG 와 동일하게 유지한다.
 # 재학습은 모델 구조·하이퍼파라미터를 바꾸지 않는다 — 바뀌는 것은 데이터와 scaler뿐이다.
+# epochs만 config(CNC_TRAIN_EPOCHS)에서 온다.
 TRAINING_CONFIG = {
     "window_size": 20,
     "hidden_size": 64,
     "latent_dim": 16,
-    "epochs": 50,
+    "epochs": TRAIN_EPOCHS,
     "batch_size": 64,
     "learning_rate": 1e-3,
     "random_seed": 42,
@@ -92,13 +94,13 @@ def run_retraining(
     timeline_dir: Path,
     labels_db: Path,
     current_day: int,
-    root: Path,
+    data_root: Path,
     lookback_days: int = 30,
 ) -> dict:
     """라벨 도착분으로 재학습하고 MLflow에 새 run으로 기록한다. 승격은 하지 않는다.
 
-    산출물은 data/retrain/<timestamp>/ 에 격리한다 — 게이트가 거부할 수도 있는데
-    정본(data/model/, data/processed/scaler.json)을 먼저 덮어쓰면 champion과
+    산출물은 <data_root>/retrain/<timestamp>/ 에 격리한다 — 게이트가 거부할 수도 있는데
+    정본(<data_root>/model/, <data_root>/processed/scaler.json)을 먼저 덮어쓰면 champion과
     짝이 어긋난 상태로 남는다.
     """
     from monitoring.labels import get_arrived_labels
@@ -106,7 +108,7 @@ def run_retraining(
     arrived = get_arrived_labels(current_day, labels_db)
     train_raw = collect_normal_batches(arrived, timeline_dir, current_day, lookback_days)
 
-    retrain_dir = root / "data" / "retrain" / datetime.now().strftime("%Y%m%d_%H%M%S")
+    retrain_dir = data_root / "retrain" / datetime.now().strftime("%Y%m%d_%H%M%S")
     retrain_dir.mkdir(parents=True, exist_ok=True)
 
     scaler = fit_scaler(train_raw, FEATURE_COLUMNS)
@@ -121,8 +123,8 @@ def run_retraining(
         retrain_dir / "train.csv", index=False
     )
 
-    old_scaler_dict = json.loads((root / "data" / "processed" / "scaler.json").read_text())
-    eval_old = pd.read_csv(root / "data" / "processed" / "eval.csv")
+    old_scaler_dict = json.loads((data_root / "processed" / "scaler.json").read_text())
+    eval_old = pd.read_csv(data_root / "processed" / "eval.csv")
     rescale_eval(eval_old, old_scaler_dict, new_scaler_dict, FEATURE_COLUMNS).to_csv(
         retrain_dir / "eval.csv", index=False
     )

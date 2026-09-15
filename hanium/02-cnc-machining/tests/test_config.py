@@ -65,3 +65,51 @@ def test_env_overrides_are_parsed(monkeypatch, tmp_path):
 def test_unparsable_value_fails_loudly(monkeypatch):
     with pytest.raises(ValueError, match="CNC_COOLDOWN_DAYS"):
         _reload(monkeypatch, CNC_COOLDOWN_DAYS="five")
+
+
+import json
+import subprocess
+import sys
+
+SRC_WIRING = """
+import json
+import lstm_ae.tracking as tracking
+import retraining.runner as runner
+import serving.app as app
+print(json.dumps({
+    "mlflow_dir": str(tracking.MLFLOW_DIR),
+    "db_path": str(app.DB_PATH),
+    "shadow_db": str(app.SHADOW_DB),
+    "dataset_dir": str(app.DATASET_DIR),
+    "drift_window": app.DRIFT_WINDOW_SIZE,
+    "batches_per_day": app.TIMELINE_BATCHES_PER_DAY,
+    "epochs": runner.TRAINING_CONFIG["epochs"],
+}))
+"""
+
+
+def _run_snippet(snippet: str, env: dict) -> dict:
+    """config는 import 시 환경을 읽으므로, 배선은 새 인터프리터에서 확인한다."""
+    result = subprocess.run(
+        [sys.executable, "-c", snippet],
+        env={**os.environ, **env}, capture_output=True, text=True, check=True, timeout=180,
+    )
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def test_src_modules_follow_config(tmp_path):
+    got = _run_snippet(SRC_WIRING, {
+        "CNC_DATA_ROOT": str(tmp_path),
+        "CNC_DRIFT_WINDOW_SIZE": "4",
+        "CNC_BATCHES_PER_DAY": "2",
+        "CNC_TRAIN_EPOCHS": "1",
+    })
+
+    root = str(tmp_path)
+    assert got["mlflow_dir"] == f"{root}/mlflow"
+    assert got["db_path"] == f"{root}/monitoring/requests.db"
+    assert got["shadow_db"] == f"{root}/monitoring/shadow.db"
+    assert got["dataset_dir"] == f"{root}/dataset/CNC 비식별화 원본데이터_1209/CNC Virtual Data set _v2"
+    assert got["drift_window"] == 4
+    assert got["batches_per_day"] == 2
+    assert got["epochs"] == 1

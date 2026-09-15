@@ -8,6 +8,7 @@ import mlflow
 import pandas as pd
 from mlflow.tracking import MlflowClient
 
+from config import DATA_ROOT
 from .plotting import (
     build_confusion_matrix_figure,
     build_feature_contribution_heatmap_figure,
@@ -16,8 +17,7 @@ from .plotting import (
     build_timeline_error_figure,
 )
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-MLFLOW_DIR = ROOT / "data" / "mlflow"
+MLFLOW_DIR = DATA_ROOT / "mlflow"
 EXPERIMENT_NAME = "cnc-lstm-ae"
 REGISTERED_MODEL_NAME = "cnc-lstm-ae"
 CHAMPION_ALIAS = "champion"

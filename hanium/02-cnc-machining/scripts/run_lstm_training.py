@@ -1,12 +1,12 @@
 import json
 import sys
-from pathlib import Path
 
 import mlflow
 import mlflow.pytorch
 import pandas as pd
 from mlflow.tracking import MlflowClient
 
+from config import DATA_ROOT, TRAIN_EPOCHS
 from lstm_ae.pipeline import run_lstm_pipeline
 from lstm_ae.tracking import (
     REGISTERED_MODEL_NAME,
@@ -17,13 +17,14 @@ from lstm_ae.tracking import (
 )
 from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 
-ROOT = Path(__file__).resolve().parent.parent
+PROCESSED_DIR = DATA_ROOT / "processed"
+MODEL_DIR = DATA_ROOT / "model"
 
 TRAINING_CONFIG = {
     "window_size": 20,
     "hidden_size": 64,
     "latent_dim": 16,
-    "epochs": 50,
+    "epochs": TRAIN_EPOCHS,
     "batch_size": 64,
     "learning_rate": 1e-3,
     "random_seed": 42,
@@ -36,16 +37,16 @@ def main() -> None:
         TRAINING_CONFIG["random_seed"] = int(sys.argv[1])
 
     configure_tracking()
-    manifest = json.loads((ROOT / "data" / "processed" / "manifest.json").read_text())
+    manifest = json.loads((PROCESSED_DIR / "manifest.json").read_text())
 
     with mlflow.start_run():
         mlflow.log_params(build_run_params(TRAINING_CONFIG, manifest))
 
         summary = run_lstm_pipeline(
-            train_csv_path=str(ROOT / "data" / "processed" / "train.csv"),
-            eval_csv_path=str(ROOT / "data" / "processed" / "eval.csv"),
+            train_csv_path=str(PROCESSED_DIR / "train.csv"),
+            eval_csv_path=str(PROCESSED_DIR / "eval.csv"),
             feature_columns=FEATURE_COLUMNS,
-            output_dir=str(ROOT / "data" / "model"),
+            output_dir=str(MODEL_DIR),
             exclude_from_ranking=SETUP_CONSTANT_COLUMNS,
             **TRAINING_CONFIG,
         )
@@ -59,15 +60,11 @@ def main() -> None:
             serialization_format="pickle",
         )
 
-        experiment_scores = pd.read_csv(ROOT / "data" / "model" / "experiment_scores.csv")
-        feature_error_scores = pd.read_csv(ROOT / "data" / "model" / "eval_feature_errors.csv")
-        feature_baseline = json.loads(
-            (ROOT / "data" / "model" / "feature_baseline.json").read_text()
-        )
-        timeline_errors = pd.read_csv(ROOT / "data" / "model" / "eval_timeline_errors.csv")
-        reconstruction_overlay = pd.read_csv(
-            ROOT / "data" / "model" / "eval_reconstruction_overlay.csv"
-        )
+        experiment_scores = pd.read_csv(MODEL_DIR / "experiment_scores.csv")
+        feature_error_scores = pd.read_csv(MODEL_DIR / "eval_feature_errors.csv")
+        feature_baseline = json.loads((MODEL_DIR / "feature_baseline.json").read_text())
+        timeline_errors = pd.read_csv(MODEL_DIR / "eval_timeline_errors.csv")
+        reconstruction_overlay = pd.read_csv(MODEL_DIR / "eval_reconstruction_overlay.csv")
         rankable_columns = [c for c in FEATURE_COLUMNS if c not in SETUP_CONSTANT_COLUMNS]
         log_evaluation_plots(
             MlflowClient(),

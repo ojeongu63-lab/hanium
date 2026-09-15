@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, Response
 from mlflow.tracking import MlflowClient
 from openai import OpenAI
 
+from config import BATCHES_PER_DAY, DATA_ROOT, DRIFT_WINDOW_SIZE, EXPERIMENT_DIR, PROJECT_ROOT
 from lstm_ae.tracking import CHAMPION_ALIAS, REGISTERED_MODEL_NAME, configure_tracking
 from monitoring.drift import compute_drift_status
 from monitoring.logging import count_requests, get_recent_requests, log_request
@@ -27,12 +28,11 @@ from preprocessing.columns import FEATURE_COLUMNS, SETUP_CONSTANT_COLUMNS
 from rag.generation import DEFAULT_MODEL
 from serving.inference import predict_experiment, scale_features
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-DB_PATH = ROOT / "data" / "monitoring" / "requests.db"
-SHADOW_DB = ROOT / "data" / "monitoring" / "shadow.db"
-DRIFT_WINDOW_SIZE = 10
+ROOT = PROJECT_ROOT
+DB_PATH = DATA_ROOT / "monitoring" / "requests.db"
+SHADOW_DB = DATA_ROOT / "monitoring" / "shadow.db"
 DEMO_INDEX = ROOT / "demo" / "index.html"
-DATASET_DIR = ROOT / "data" / "dataset" / "CNC 비식별화 원본데이터_1209" / "CNC Virtual Data set _v2"
+DATASET_DIR = EXPERIMENT_DIR
 DEMO_INPUTS = {
     "tool_wear": ROOT / "synthetic" / "scenarios" / "tool_wear.csv",
     "feed_overload": ROOT / "synthetic" / "scenarios" / "feed_overload.csv",
@@ -65,14 +65,14 @@ def load_rag_state() -> tuple[list[dict] | None, object | None, object | None, d
     api_key = os.environ.get("OPENAI_API_KEY")
     openai_client = OpenAI(api_key=api_key) if api_key else None
 
-    corpus_path = ROOT / "data" / "rag" / "corpus.json"
-    index_path = ROOT / "data" / "rag" / "corpus.index"
+    corpus_path = DATA_ROOT / "rag" / "corpus.json"
+    index_path = DATA_ROOT / "rag" / "corpus.index"
     if not corpus_path.exists() or not index_path.exists():
         return None, None, openai_client, None
 
     rag_corpus = json.loads(corpus_path.read_text())
     rag_index = faiss.read_index(str(index_path))
-    meta_path = ROOT / "data" / "rag" / "corpus_meta.json"
+    meta_path = DATA_ROOT / "rag" / "corpus_meta.json"
     rag_versions = json.loads(meta_path.read_text()) if meta_path.exists() else None
     return rag_corpus, rag_index, openai_client, rag_versions
 
@@ -102,10 +102,10 @@ def _build_model_state(mv, run, model, include_rag: bool) -> ModelState:
     }
     window_size = int(run.data.params["window_size"])
     scaler_dict = load_companion_json(
-        mv.run_id, "scaler.json", ROOT / "data" / "processed" / "scaler.json"
+        mv.run_id, "scaler.json", DATA_ROOT / "processed" / "scaler.json"
     )
     feature_baseline = load_companion_json(
-        mv.run_id, "feature_baseline.json", ROOT / "data" / "model" / "feature_baseline.json"
+        mv.run_id, "feature_baseline.json", DATA_ROOT / "model" / "feature_baseline.json"
     )
     rag_corpus, rag_index, openai_client, rag_versions = (
         load_rag_state() if include_rag else (None, None, None, None)
@@ -285,7 +285,7 @@ def demo_input(key: str) -> FileResponse:
 
 
 TIMELINE_SCENARIOS = ("temperature", "tool_wear", "fixture_loosening")
-TIMELINE_BATCHES_PER_DAY = 5
+TIMELINE_BATCHES_PER_DAY = BATCHES_PER_DAY
 
 
 def _generate_timeline_batch(day: int, index: int, scenario: str) -> pd.DataFrame:
