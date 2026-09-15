@@ -617,3 +617,22 @@ pull 받아 미팅하되 실시간까지 준비.
 
 뒷정리: 측정용 predict 호출이 `requests.db`에 남긴 4행(09-15 타임스탬프)은 삭제해 8행으로
 복원. 테스트 서버는 PID 파일로 종료.
+
+## 재학습 루프 통합 테스트 + compose (2026-09-15)
+
+스펙 `02-cnc-machining/docs/specs/2026-09-15-cnc-loop-integration-test-design.md`,
+계획 `02-cnc-machining/docs/plans/2026-09-15-cnc-loop-integration-test.md`.
+사용자 결정: 배관만 보장, pytest가 서버·워커를 서브프로세스로 기동, compose는 CI에서 빌드만.
+
+- [ ] Task 1 `src/config.py` — 환경변수 설정 모듈
+- [ ] Task 2 src 모듈·스크립트가 config를 읽도록
+- [ ] Task 3 feeder — config, 진행도 상한, `--start-day`
+- [ ] Task 4 워커 — config, champion 놓침 수를 MLflow에서
+- [ ] Task 5 pyproject — httpx2 본 의존성, integration 마커
+- [ ] Task 6 합성 데이터셋 생성기
+- [ ] Task 7 통합 테스트 하네스 + 스모크
+- [ ] Task 8 승격 경로 테스트
+- [ ] Task 9 거부 경로 테스트
+- [ ] Task 10 CI job 2개
+- [ ] Task 11 docker-compose + README/STRUCTURE
+- [ ] Task 12 실데이터 스모크, 스펙 정정 절, 리뷰
