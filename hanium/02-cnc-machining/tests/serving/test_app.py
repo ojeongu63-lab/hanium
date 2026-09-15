@@ -468,3 +468,50 @@ def test_demo_timeline_route_404_when_dataset_missing(monkeypatch):
     got = client.get("/demo/timeline/temperature/3/1")
     assert got.status_code == 404
     assert "데이터셋" in got.json()["detail"]
+
+
+def test_predict_does_not_block_other_requests(tmp_path, monkeypatch):
+    """추론이 도는 동안 /health 가 응답해야 한다. 추론(과 RAG 의 LLM 호출)은 동기 코드라
+    이벤트 루프 안에서 실행되면 서버 전체가 멈춘다(09-15 실측: predict 4.4초 동안 /health 3.9초 대기).
+    타이밍이 아니라 순서로 검증한다 — /health 가 답한 뒤에야 추론을 풀어 준다."""
+    import threading
+
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    monkeypatch.setattr(app_module, "_state", None)
+    monkeypatch.setattr(app_module, "_shadow_state", None)  # 앞 테스트(/start-shadow)가 남긴 전역을 격리
+    monkeypatch.setattr(app_module, "load_model_state", lambda: _fake_state(window_size=6))
+    app.dependency_overrides[get_model_state] = lambda: _fake_state(window_size=6)
+
+    entered = threading.Event()   # predict 가 추론에 들어갔다
+    release = threading.Event()   # /health 가 답한 뒤에 풀어 준다
+    released_in_time = []
+    real_predict = app_module.predict_experiment
+
+    def stuck_predict(*args, **kwargs):
+        entered.set()
+        released_in_time.append(release.wait(timeout=5))
+        return real_predict(*args, **kwargs)
+
+    monkeypatch.setattr(app_module, "predict_experiment", stuck_predict)
+
+    responses = {}
+    with TestClient(app) as client:  # 두 요청이 같은 이벤트 루프를 타야 한다
+        worker = threading.Thread(
+            target=lambda: responses.update(
+                predict=client.post(
+                    "/predict",
+                    files={"file": ("experiment.csv", io.BytesIO(_raw_csv_bytes(20)), "text/csv")},
+                )
+            )
+        )
+        worker.start()
+        assert entered.wait(timeout=5), "predict 가 추론에 진입하지 못함"
+        responses["health"] = client.get("/health")
+        release.set()
+        worker.join(timeout=10)
+
+    assert responses["health"].status_code == 200
+    assert responses["predict"].status_code == 200
+    assert released_in_time == [True], "추론이 도는 동안 /health 가 막혔다(이벤트 루프 블로킹)"

@@ -182,12 +182,12 @@ def health(state: ModelState = Depends(get_model_state)) -> dict:
 
 
 @app.post("/predict")
-async def predict(
+def predict(
     file: UploadFile,
     method: Literal["mean", "max", "p95"] = "mean",
     state: ModelState = Depends(get_model_state),
 ) -> dict:
-    content = await file.read()
+    content = file.file.read()
     try:
         df = pd.read_csv(io.BytesIO(content))
         result = predict_experiment(

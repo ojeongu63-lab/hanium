@@ -580,3 +580,40 @@ pull 받아 미팅하되 실시간까지 준비.
 
 테스트 211개 + node 1개 통과. `demo/index.html` 685KB. 남은 일: 사용자가 브라우저에서
 시뮬레이션 탭 재생·이벤트 정지·칩 전환·지금 계산을 눈으로 확인, 개인 PC 리허설.
+
+## 서빙 — `/predict` 이벤트 루프 블로킹 수정 (2026-09-15)
+
+배경: 09-15 코드 리뷰에서 `/predict`가 `async def`인데 안에서 torch 추론과 OpenAI 호출을
+동기로 실행하는 것을 발견. 실측(experiment_07을 60배로 이어 붙인 33,900행): predict 4.4초
+동안 `/health`가 3.9초 대기. RAG를 켜면 LLM 호출 5~10초 동안 데모 페이지의 `/health` 폴링과
+섀도우 추론까지 같이 멈춘다. 사용자 결정: "실제 MLOps 관점" 격차 중 1번으로 먼저 수정.
+`main`에서 작업(`sim-realistic`은 실험 브랜치).
+
+- [x] RED — `tests/serving/test_app.py::test_predict_does_not_block_other_requests`
+      (추론이 막혀 있는 동안 `/health`가 답해야 함. 타이밍이 아니라 순서로 검증 —
+      `/health`가 답한 뒤에야 추론을 풀어 준다) → 현재 코드로 실패 확인(5초 타임아웃까지 막힘)
+- [x] GREEN — `src/serving/app.py`: `async def predict` → `def predict`,
+      `await file.read()` → `file.file.read()`. FastAPI가 동기 엔드포인트를 스레드풀에서
+      돌린다(`/health`·`/drift-status`·`/reload-model`은 원래부터 동기라 같은 방식)
+      → 단독 통과, 전체 212개 통과
+- [x] 실서버 재측정(포트 8917, champion v1) → predict 4.6초 실행 중 `/health` 0.004초
+
+### 리뷰
+
+| | 수정 전 | 수정 후 |
+|---|---|---|
+| predict (33,900행) | 4.4초 | 4.6초 |
+| 그 동안 `/health` | 3.9초 | 0.004초 |
+
+**실행 중 발견**: 새 테스트가 단독으로는 통과하고 전체 스위트에서는 `[True, True]`로
+실패했다. 기존 `/start-shadow` 테스트가 엔드포인트를 실제로 호출해 전역 `_shadow_state`를
+세팅한 채 되돌리지 않아서(monkeypatch가 아님), 뒤에 오는 테스트의 predict가 섀도우 추론까지
+한 번 더 탄다. 새 테스트 안에서 `_shadow_state`를 None으로 격리해 해결. 기존 테스트의
+누수 자체는 손대지 않았다 — 다른 테스트에도 영향을 줄 수 있으니 정리 후보.
+
+스레드 안전성: 전역 `_state`는 요청 시작 시 `Depends`로 참조를 잡고 `/reload-model`은
+참조를 통째로 바꾸므로 진행 중 요청은 옛 모델로 끝난다. torch 추론, SQLite(호출마다 새
+연결), OpenAI 클라이언트는 스레드에서 호출해도 된다.
+
+뒷정리: 측정용 predict 호출이 `requests.db`에 남긴 4행(09-15 타임스탬프)은 삭제해 8행으로
+복원. 테스트 서버는 PID 파일로 종료.
