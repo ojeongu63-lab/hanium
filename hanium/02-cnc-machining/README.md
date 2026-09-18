@@ -272,12 +272,49 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
   시나리오 합쳐 8/8 정답)는 [`../tasks/todo.md`](../tasks/todo.md)와 각
   스펙의 "실행 결과에 따른 정정" 절에 기록돼 있다.
 
+**docker compose로 같은 것을 한 명령으로** (docker 가 있는 PC — 이미지 안에 코드·의존성, `data/`는 볼륨):
+
+```bash
+cd 02-cnc-machining
+SCENARIO=temperature DAYS=40 PACE=15 docker compose --profile demo up --abort-on-container-exit
+```
+
+- `serving`(8000 포트) → healthy 가 되면 `worker`, `feeder` 가 순서대로 뜬다. `--profile demo` 를
+  빼면 feeder 없이 서빙 + 워커만 뜬다(실트래픽을 직접 넣을 때).
+- 루프 상수·경로는 `CNC_*` 환경변수로 바꿀 수 있다(`src/config.py`). 없으면 기본값 — 이 절의
+  설명과 같다.
+
+  | 환경변수 | 기본값 | 무엇을 바꾸나 |
+  |---|---|---|
+  | `CNC_DATA_ROOT` | `data/` 폴더 | 데이터 루트 경로(모든 데이터 경로가 여기서 파생) |
+  | `CNC_DRIFT_WINDOW_SIZE` | 10 | 드리프트 판정 창 크기 |
+  | `CNC_CONSECUTIVE_K` | 3 | 연속 flagged 횟수(트리거 조건) |
+  | `CNC_COOLDOWN_DAYS` | 5 | 재트리거 쿨다운 일수 |
+  | `CNC_GATE_SAMPLE_SIZE` | 20 | 게이트 검증 표본 수 |
+  | `CNC_TOTAL_DAYS` | 40 | feeder 가 도는 총 일수 |
+  | `CNC_BATCHES_PER_DAY` | 5 | 하루 배치 수 |
+  | `CNC_DRIFT_START_DAY` | 10 | 변형이 시작되는 날 |
+  | `CNC_LABEL_DELAY_DAYS` | 7 | 라벨 도착까지 지연일 |
+  | `CNC_LABEL_FLIP_DAY` | 21 | QC 불합격이 시작되는 날(고장 시나리오) |
+  | `CNC_DRIFT_MAX_PROGRESS` | 없음(상한 없음) | 변형 진폭 상한. `1.0`을 주면 40일 이후 변형이 더 커지지 않는다(섀도우 스펙의 정정 절) |
+  | `CNC_POS_DRIFT`, `CNC_CUR_DRIFT`, `CNC_WEAR_RATE`, `CNC_VIBRATION_RATE` | 0.02, 0.02, 0.2, 3.65 | 시나리오별 변형 속도(위치·전류, 공구마모, 진동) |
+  | `CNC_TRAIN_EPOCHS` | 50 | 재학습 epoch 수 |
+
+- 시나리오 전환 전 DB·timeline 비우기는 세 터미널 방식과 같다.
+- 리눅스 호스트에서는 컨테이너가 만든 `data/` 파일이 root 소유가 된다. 거슬리면 서비스마다
+  `user: "1000:1000"` 을 붙인다.
+- 루프 배관 자체는 `nice -n 19 uv run pytest -m integration` 으로 검증된다(서버·워커를 실제
+  프로세스로 띄워 합성 데이터로 트리거 → 재학습 → 게이트 → 섀도우 → 승격/거부까지 확인,
+  실데이터 불필요, 약 2.5분). 그냥 `uv run pytest`는 단위 테스트만 돈다.
+
 ### 2-8. Docker로 실행
 
 로컬에 `uv`를 안 깔고도, 다른 컴퓨터에서 동일하게 서빙 앱을 띄울 수 있다.
 이미지 안에는 코드·의존성만 담고, `data/`(모델·MLflow 기록)는 볼륨으로
 연결한다 — 그래야 이미지가 커지지 않고, 재학습·승격으로 `data/`가 바뀌어도
 이미지를 다시 빌드할 필요가 없다.
+
+워커·feeder까지 함께 띄우려면 §2-7 끝의 compose 설명을 본다.
 
 ```bash
 cd 02-cnc-machining

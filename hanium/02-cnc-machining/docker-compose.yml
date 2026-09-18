@@ -1,0 +1,45 @@
+# 서빙 + 감시 워커 + (선택) feeder. README §2-7 의 세 터미널을 한 명령으로.
+#   docker compose up                                  # 서빙 + 워커(temperature)
+#   SCENARIO=tool_wear docker compose up               # 다른 시나리오
+#   DAYS=40 PACE=15 docker compose --profile demo up   # feeder 까지 (가상 타임라인 주입)
+# data/ 는 호스트 볼륨 — 재학습·백업·MLflow 기록이 호스트에 남는다. 시나리오를 바꾸기 전엔
+# data/monitoring/{labels,requests,shadow}.db 와 data/timeline/<이전> 을 비운다(README §2-7).
+services:
+  serving:
+    build: .
+    image: cnc-serving
+    ports: ["8000:8000"]
+    volumes: ["./data:/app/data"]
+    env_file:
+      - path: .env
+        required: false
+    healthcheck:
+      # /health 는 champion 이 로드돼야 200 — healthy = 모델 준비됨
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  # worker·feeder 는 serving 이 빌드한 cnc-serving 이미지를 그대로 쓴다 — pull_policy: never 가
+  # 없으면 일부 compose 버전이 이 이미지를 registry 에서 받으려 한다.
+  worker:
+    image: cnc-serving
+    pull_policy: never
+    command: uv run --no-sync python monitoring/drift_worker.py ${SCENARIO:-temperature} --base-url http://serving:8000
+    volumes: ["./data:/app/data"]
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      serving:
+        condition: service_healthy
+
+  feeder:
+    image: cnc-serving
+    pull_policy: never
+    profiles: ["demo"]
+    command: uv run --no-sync python monitoring/simulate_timeline.py ${SCENARIO:-temperature} --serve-url http://serving:8000 --days ${DAYS:-40} --pace-seconds ${PACE:-15}
+    volumes: ["./data:/app/data"]
+    depends_on:
+      serving:
+        condition: service_healthy
