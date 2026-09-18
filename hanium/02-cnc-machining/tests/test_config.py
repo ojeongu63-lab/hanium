@@ -22,9 +22,6 @@ def _reload(monkeypatch, **env):
 def _restore_config():
     """reload가 남긴 상태를 되돌린다 — 다른 테스트가 import config 를 다시 할 수 있다."""
     yield
-    for key in list(os.environ):
-        if key.startswith("CNC_"):
-            os.environ.pop(key, None)
     import config
 
     importlib.reload(config)
