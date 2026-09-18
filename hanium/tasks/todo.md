@@ -656,3 +656,11 @@ pull 받아 미팅하되 실시간까지 준비.
 - 배운 것: 계획서 속 테스트 코드도 돌려 보기 전엔 가설이다. 반환 형태를 바꾸면 모든 호출부를 grep한다.
   둘 다 `tasks/lessons.md`.
 - 남은 일: CI 결과 확인(push 후), 개인 PC 에서 `docker compose build` 와 `--profile demo` 리허설
+- 후속 과제(최종 리뷰에서 보류, 동작 영향 없음):
+  - `test_app.py`만 단독 실행하면 MLflow 기본 URI로 cwd에 `mlflow.db`가 생긴다. 전체 스위트에선
+    `test_tracking.py`가 전역 URI를 tmp로 남겨 우연히 안 생긴다(순서 의존). autouse 픽스처에서 tmp tracking URI 설정.
+  - 승격 run의 `trigger_day == "5"` 단언은 스펙이 허용한 재시도 승격을 막는다. `shadow_started`가 찍힌 날
+    집합과 비교하는 형태로 완화(옛 버그도 계속 잡힌다).
+  - CI 실패 시 워커·서버 로그를 아티팩트로 올리기(`--basetemp` + `upload-artifact`, 버전 확인 후).
+  - `tests/test_config.py`의 서브프로세스 3개를 1개로 합치기(단위 스위트 +10~15초의 원인).
+  - `conftest.py` `stop()`에서 kill 뒤 `wait(timeout=5)`가 드물게 `TimeoutExpired`를 내면 나머지 정리를 건너뛴다.
