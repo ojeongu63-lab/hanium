@@ -3,9 +3,9 @@ name: CNC tests
 on:
   push:
     branches: [main]
-    paths: ['hanium/02-cnc-machining/**']
+    paths: ['hanium/02-cnc-machining/**', '.github/workflows/cnc-tests.yml']
   pull_request:
-    paths: ['hanium/02-cnc-machining/**']
+    paths: ['hanium/02-cnc-machining/**', '.github/workflows/cnc-tests.yml']
   workflow_dispatch: {}
 
 jobs:
@@ -19,3 +19,28 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - run: uv sync
       - run: uv run pytest -q
+
+  loop-integration:
+    # 서버·워커를 서브프로세스로 띄워 재학습 루프(트리거→재학습→게이트→섀도우→승격/거부)를 끝까지 돈다.
+    # 실데이터 없이 합성 데이터셋으로 champion 을 만든다 — docs/specs/2026-09-15-cnc-loop-integration-test-design.md
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: hanium/02-cnc-machining
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - run: uv sync
+      - run: uv run pytest -m integration -q
+
+  docker-build:
+    # Dockerfile 이 지금까지 한 번도 자동 검증된 적이 없다. main push 와 수동 실행에서만 빌드한다.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hanium/02-cnc-machining
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose build
