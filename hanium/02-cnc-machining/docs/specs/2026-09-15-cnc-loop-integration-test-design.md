@@ -284,3 +284,59 @@ services:
 `src/retraining/gate.py`·`trigger.py`·`promotion.py`의 판정 로직, `src/monitoring/drift.py`의
 임계값, 상수의 기본값, `demo/`, `rag/`, `synthetic/`, `loocv/`, `augmentation/`,
 `monitoring/simulate_drift.py`, `monitoring/sweep_drift_constants.py`.
+
+## 실행 결과에 따른 정정 (2026-09-18)
+
+계획 12개 태스크를 `loop-integration-test` 브랜치에서 실행했다(커밋 747b9b9~e8d1a8d 14개와 이 기록 커밋,
+push 전). 완료 기준 6개 중 1·2·5·6은 충족했고, 3(CI)·4(docker PC 실행)은 push 뒤로 남는다.
+
+| 항목 | 결과 |
+|---|---|
+| `uv run pytest -q` | 229 passed, 3 deselected, 29~34초 |
+| `uv run pytest -m integration -q` (이 서버, nice) | 3 passed, 152.3초 (부트스트랩 3회 포함 — 승격 54.4초, 거부 51.7초, 하네스 스모크 36.8초) |
+| 승격 경로 | 트리거 Day 5, 게이트 통과 Day 5, 섀도우 시작 Day 5, 승격 Day 7 (버전 2). 승격 뒤 ratio 0.35~0.48, 재트리거 없음 |
+| 거부 경로 | 트리거 Day 5·7, 사유 "G2 판정 불가: 창에 정상 라벨 없음(오탐 회귀 확인 불가)"(G2 창 정상 0·불량 5), estimated_cause=tool_wear(두 번 다). 섀도우·승격 없음, champion v1 유지 |
+| 실데이터 3일 스모크(환경변수 없음) | Day 01~03 flagged=False action=none (ratio 0.00 / 0.68 / 0.68), 정본 해시 불변(model.pt `8841fd72`, scaler.json `9ab55583`), G1 기준 1건 |
+| CI | push 전. push 뒤 세 job 녹색을 확인하고 워크플로 URL을 여기 적는다(`docker-build`는 main push·수동 실행에서만 돈다) |
+| compose | 이 서버엔 docker 없음. YAML 파싱만. CI `docker-build`와 개인 PC 리허설(검증 4번)로 남김 |
+
+두 루프 테스트의 Day 줄은 세 번 돌려 세 번 같았다.
+
+실데이터 스모크는 포트 8918, 세 프로세스 모두 `nice -n 19`, 워커 폴링 2초. 워커가 Day 1을 8번째 요청 뒤에
+처리해 창(10개)이 안 차 0.00, Day 2·3은 15개가 다 들어온 뒤 연달아 처리해 같은 창(0.68)을 봤다. 실행 전
+`requests.db`·`shadow.db`·`data/timeline/temperature`를 옮기고 `mlflow.db`를 복사해 뒀다가 끝난 뒤 되돌렸다.
+`data/` 파일 2248개의 경로·크기·mtime이 실행 전과 같고 `requests.db`는 8행이다.
+
+계획과 달랐던 점:
+
+- **하네스가 기존 버그 2개를 찾았다(이 브랜치에서 수정).**
+  - 독립 실행 워커가 09-03(6b5f12b)부터 시작 직후 죽고 있었다. `load_rag_state()`가 4-튜플을 돌려주는데
+    `drift_worker.main()`은 3개로 언패킹해 `ValueError`. 단위 테스트는 `main()`을 돌리지 않는다. a3d8e25.
+  - feeder 경합. `feed_day`가 배치마다 `/predict` 직후 라벨을 적었고, 워커는 `labels.db`의
+    `MAX(produced_day)`를 시계로 쓴다. 그래서 그날 배치 일부만 들어온 채로 그날을 처리했다(재현: Day 1을
+    5개 중 3개 게시 뒤 처리 → 0.00, 다 들어오면 0.94). 그날 배치를 다 보낸 뒤 라벨을 적는다. e325547.
+- **§2 잡음 배수는 3이 아니라 10.** `CNC_TRAIN_EPOCHS=2`에 train 윈도우 56개(배치 64라 epoch당 1스텝)여서
+  합성 champion은 사실상 학습이 안 된다. ×3이면 정상 배치가 임계값의 0.90~0.92, Day 1 창 0.94로 flagged →
+  Day 3 조기 트리거. ×10이면 Day 1 0.62, Day 2 0.45로 flag 없음(`fixture_dataset.NOISE_FACTOR = 10.0`).
+- **§3 섀도우 기록은 5건이 아니라 10건**(생산일 6·7). Day 7 배치가 워커의 Day 7 처리(승격)보다 먼저 들어온다.
+  테스트는 5건 이상을 확인한다.
+- **§5 httpx2 서술이 틀렸다.** `openai` 3.0이 `httpx2`를 런타임 의존성으로 끌어와 `--no-dev` 이미지에도 이미
+  있었다(`uv tree --no-dev --invert --package httpx2`). 워커·feeder가 직접 import하므로 본 의존성 선언은
+  그대로 했다(Task 5). 버그 수정이 아니라 명시다.
+- **계획의 테스트 코드 버그.** MLflow 3.14 SQL store는 모델 버전을 int로 돌려준다. 계획의 `champion != "1"`
+  (Task 8)은 실패할 수 없는 단언이었고 `... .version == "1"`(Task 9)은 매번 실패했다. 둘 다
+  `_champion_version`으로 `str(version)`을 비교한다.
+- **계획에 없던 테스트 보강.** 핵심 단언 메시지에 워커 로그 꼬리(§3 "워커 로그는 실패 시 pytest 출력에
+  붙인다"), `next(..., None)` 가드, 설치된 `model.pt`·`scaler.json`이 같은 `retrain/<ts>` 한 곳의 것인지
+  보는 쌍 검증.
+- **그 밖.** 통합 테스트는 §3의 2개에 하네스 스모크 1개(계획 Task 7)를 더해 3개. README에 §1 환경변수 표와
+  통합 테스트 실행법(계획은 한 줄). compose는 serving이 `cnc-serving` 이미지를 빌드하고 worker·feeder가 같은
+  이미지를 쓴다(`pull_policy: never` 추가). STRUCTURE 테스트 수는 단위 229·통합 3.
+- **실데이터 스모크 복원 대상에 `mlflow.db`를 더했다.** `/drift-status`는 창이 차 있으면 호출마다 champion
+  run(지금 v1)에 드리프트 지표를 기록한다(`log_drift_metrics`). 스모크 뒤 md5가 바뀌었고, 백업으로 되돌려
+  원래 값과 같다. 서버가 champion을 로드할 때 MLflow가 `registered_model_meta`를 같은 내용으로 다시 쓰는
+  것도 봤다(mtime만 바뀜, 되돌림).
+- **남은 문제(최종 리뷰로, 이번엔 안 고침).**
+  - 섀도우가 끝날 때 워커가 `trigger_day` 태그를 섀도우 종료일로 덮어쓴다. 승격 run이 5가 아니라 7로 남는다.
+  - 기본 단위 스위트가 실제 `data/monitoring/shadow.db`에 매 실행 2행을 쓴다(`tests/serving/test_app.py`
+    격리 누수). 지금 46행, 전부 `batch_id='experiment'`.

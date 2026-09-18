@@ -624,15 +624,34 @@ pull 받아 미팅하되 실시간까지 준비.
 계획 `02-cnc-machining/docs/plans/2026-09-15-cnc-loop-integration-test.md`.
 사용자 결정: 배관만 보장, pytest가 서버·워커를 서브프로세스로 기동, compose는 CI에서 빌드만.
 
-- [ ] Task 1 `src/config.py` — 환경변수 설정 모듈
-- [ ] Task 2 src 모듈·스크립트가 config를 읽도록
-- [ ] Task 3 feeder — config, 진행도 상한, `--start-day`
-- [ ] Task 4 워커 — config, champion 놓침 수를 MLflow에서
-- [ ] Task 5 pyproject — httpx2 본 의존성, integration 마커
-- [ ] Task 6 합성 데이터셋 생성기
-- [ ] Task 7 통합 테스트 하네스 + 스모크
-- [ ] Task 8 승격 경로 테스트
-- [ ] Task 9 거부 경로 테스트
-- [ ] Task 10 CI job 2개
-- [ ] Task 11 docker-compose + README/STRUCTURE
-- [ ] Task 12 실데이터 스모크, 스펙 정정 절, 리뷰
+- [x] Task 1 `src/config.py` — 환경변수 설정 모듈
+- [x] Task 2 src 모듈·스크립트가 config를 읽도록
+- [x] Task 3 feeder — config, 진행도 상한, `--start-day`
+- [x] Task 4 워커 — config, champion 놓침 수를 MLflow에서
+- [x] Task 5 pyproject — httpx2 본 의존성, integration 마커
+- [x] Task 6 합성 데이터셋 생성기
+- [x] Task 7 통합 테스트 하네스 + 스모크
+- [x] Task 8 승격 경로 테스트
+- [x] Task 9 거부 경로 테스트
+- [x] Task 10 CI job 2개
+- [x] Task 11 docker-compose + README/STRUCTURE
+- [x] Task 12 실데이터 스모크, 스펙 정정 절, 리뷰
+
+### 리뷰
+
+- 통합 테스트 3개, 이 서버(`nice -n 19`)에서 152.3초. 단위 229개(3 deselected). 커밋 747b9b9~e8d1a8d 14개와
+  이 기록 커밋, push 안 함. 승격 경로는 Day 5 트리거 → Day 7 v2 승격, 거부 경로는 Day 5·7 두 번 다 "정상 라벨
+  없음"으로 거부. 실데이터 3일 스모크(환경변수 없음)는 Day 01~03 flagged=False(0.00 / 0.68 / 0.68), G1 기준
+  1건, 정본 해시 불변, 실데이터 원상복구. 수치는 스펙 "실행 결과에 따른 정정 (2026-09-18)".
+- 실행 중 발견한 것:
+  - 독립 실행 워커가 09-03(6b5f12b)부터 시작 직후 죽고 있었다 — `load_rag_state()` 4-튜플을 3개로 언패킹(a3d8e25).
+  - feeder가 배치마다 라벨을 적어 워커가 그날 배치 일부만 보고 그날을 처리했다 — 다 보낸 뒤 라벨(e325547).
+  - 2 epoch 합성 champion은 사실상 미학습이라 잡음 ×3이면 Day 1부터 flagged(0.94) → Day 3 조기 트리거. ×10으로.
+  - 계획의 테스트 단언 2개가 MLflow가 int로 주는 버전을 문자열 "1"과 비교했다(하나는 항상 통과, 하나는 항상 실패).
+  - 스펙 §5의 "httpx2가 dev 전용이라 이미지에서 import 실패"는 틀렸다(openai 3.0이 이미 끌어옴). 직접 의존성 선언은 유지.
+  - `/drift-status`가 champion run에 지표를 적으므로 실데이터 스모크는 `mlflow.db`까지 백업·복원했다.
+  - 최종 리뷰로 넘긴 것: 섀도우 종료 시 `trigger_day` 태그 덮어쓰기, 단위 스위트가 실제 `shadow.db`에 매번
+    2행 기록(`test_app.py` 격리 누수, 지금 46행).
+- 배운 것: 계획서 속 테스트 코드도 돌려 보기 전엔 가설이다. 반환 형태를 바꾸면 모든 호출부를 grep한다.
+  둘 다 `tasks/lessons.md`.
+- 남은 일: CI 결과 확인(push 후), 개인 PC 에서 `docker compose build` 와 `--profile demo` 리허설
