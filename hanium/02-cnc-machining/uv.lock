@@ -287,6 +287,7 @@ source = { editable = "." }
 dependencies = [
     { name = "faiss-cpu" },
     { name = "fastapi" },
+    { name = "httpx2" },
     { name = "matplotlib" },
     { name = "mlflow" },
     { name = "numpy" },
@@ -301,7 +302,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx2" },
     { name = "pytest" },
 ]
 
@@ -309,6 +309,7 @@ dev = [
 requires-dist = [
     { name = "faiss-cpu", specifier = ">=1.9.0" },
     { name = "fastapi", specifier = ">=0.140.7" },
+    { name = "httpx2", specifier = ">=2.9.1" },
     { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "mlflow", specifier = ">=3.14" },
     { name = "numpy", specifier = ">=2.5.1" },
@@ -321,10 +322,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpx2", specifier = ">=2.9.1" },
-    { name = "pytest", specifier = ">=9.1.1" },
-]
+dev = [{ name = "pytest", specifier = ">=9.1.1" }]
 
 [[package]]
 name = "colorama"
