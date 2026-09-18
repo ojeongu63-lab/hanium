@@ -22,9 +22,12 @@ EXPERIMENT_SUBDIR = "CNC Virtual Data set _v2"
 ROWS = 150
 # 임계값은 train 실험 8개 점수의 p95 라 사실상 최댓값이다. 8개가 비슷하면 정상 배치의
 # 점수/임계값 비율이 1.0 근처가 되어 변형 전에도 출력 드리프트(비율 > 0.8)가 켜진다.
-# 실험 하나의 잡음을 키워 임계값을 끌어올리면 나머지 7개는 0.5 안팎에 머문다(스펙 §2).
+# 그래서 실험 하나의 잡음을 키워 임계값을 끌어올린다(스펙 §2). 하네스의 2 에폭 champion 은
+# 사실상 미학습이라(점수 ≈ 스케일된 값의 제곱 평균) ×3 으로는 모자랐다: 실측 정상 배치
+# 0.90~0.92, 17번 1.05, Day 1 부터 flagged. ×10 이면 변형 전 창이 0.8 아래에 머문다
+# (실측 Day 1 0.62 — 17번 포함 창, Day 2 0.45).
 NOISY_TRAIN_ID = 17
-NOISE_FACTOR = 3.0
+NOISE_FACTOR = 10.0
 BAD_SCALE_COLUMNS = ["S_OutputCurrent", "S_OutputPower", "S_CurrentFeedback"]
 BAD_FACTOR = 3.0
 CONSTANT_COLUMNS = {"S_SystemInertia": 12.0, "M_CURRENT_FEEDRATE": 6.0}  # 실험당 상수(설정값)
