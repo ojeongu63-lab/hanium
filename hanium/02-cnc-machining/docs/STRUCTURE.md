@@ -32,10 +32,10 @@ recall 0.91), 운영 중 입력이 변하면 자동으로 재학습하되 검증
 | 운영 | `src/monitoring/` | 요청 로그, 드리프트 판정, QC 라벨, 섀도우 기록, 원인 추정 |
 | 운영 | `src/retraining/` | 트리거, 재학습, 게이트, 승격과 롤백 |
 | 운영 | `monitoring/` | 감시 워커, 가상 운영 타임라인 시뮬레이터 |
+| 운영 | `docker-compose.yml` | 서빙 + 워커 + feeder 를 한 명령으로. `data/` 는 볼륨 |
 | 검증 | `loocv/`, `synthetic/`, `augmentation/` | 교차검증, 데모용 합성 시나리오, 증강 실험. 서빙과 무관 |
 | 데모 | `demo/` | 미팅 데모 페이지. 생성 스크립트, 재생 엔진(`sim_engine.js`), 생성물 `index.html`(서버 없이 열림, `/demo`로 열면 실시간) |
 | 공통 | `tests/` | 단위 테스트 229개(`src/` 구조를 따름) + `tests/integration/` 루프 통합 테스트 3개(서버·워커를 실제 프로세스로 띄워 합성 데이터로 트리거→재학습→게이트→섀도우→승격/거부까지, `uv run pytest -m integration`) |
-| 운영 | `docker-compose.yml` | 서빙 + 워커 + feeder 를 한 명령으로. `data/` 는 볼륨 |
 | 공통 | `docs/` | 기능별 설계 스펙과 구현 계획(각 13건), 이 문서 |
 | 공통 | `data/` | 원본, 전처리, 모델, MLflow, 로그. git에 없음 |
 
