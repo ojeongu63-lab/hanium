@@ -63,6 +63,7 @@ class ShadowState:
                                     # 라벨 지연(7일) 때문에 "새로 도착한 라벨"은 여전히 섀도우
                                     # 시작 이전 생산분을 가리킬 수 있어, 도착 순서가 아니라
                                     # produced_day로 걸러야 한다(실측으로 발견).
+    trigger_day: int              # 트리거가 걸린 날 — 섀도우가 끝나는 날이 아니라 이 날을 태그로 남긴다
 
 
 @dataclass
@@ -194,6 +195,7 @@ def _start_shadow(client, state, result, current_day) -> None:
         retrain_dir=str(result["retrain_dir"]),
         missed=result["missed"],
         start_day=actual_start_day,
+        trigger_day=current_day,
     )
     print(
         f"  섀도우 시작 — version {result['model_version']} "
@@ -330,7 +332,7 @@ def _check_shadow(client, state, current_day, scenario) -> str:
     verdict = evaluate_two_sided(truths, champion_preds, candidate_preds)
 
     mlflow_client = MlflowClient()
-    _tag(mlflow_client, state.shadow.run_id, scenario, current_day,
+    _tag(mlflow_client, state.shadow.run_id, scenario, state.shadow.trigger_day,
          decision=f"shadow_{verdict['decision']}", reason=verdict["reject_reason"],
          extra=_g2_tags("shadow", verdict))
 

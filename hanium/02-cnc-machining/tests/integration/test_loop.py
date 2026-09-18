@@ -82,6 +82,7 @@ def test_shift_scenario_reaches_shadow_and_promotion(loop_factory):
     assert any(t.get("gate_decision") == "shadow_promoted" for t in tags), tags
     promoted = next(t for t in tags if t.get("gate_decision") == "shadow_promoted")
     assert {"gate_g2_n_good", "gate_g2_fa_delta", "shadow_n_good", "shadow_fa_delta"} <= set(promoted)
+    assert promoted["trigger_day"] == "5", f"trigger_day 가 트리거한 날(5)이 아님: {promoted}\n{days}"
 
     champion = _champion_version(client)
     assert champion != "1"
