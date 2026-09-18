@@ -411,7 +411,7 @@ def main() -> None:
 
     state = WorkerState(champion_missed=load_champion_missed())
     print(f"champion G1 기준: 원본 eval 놓침 {state.champion_missed}건", flush=True)
-    state.rag_corpus, _, state.openai_client = load_rag_state()
+    state.rag_corpus, _, state.openai_client, _ = load_rag_state()
     last_day = 0
 
     with httpx2.Client(base_url=args.base_url, timeout=30.0) as client:
