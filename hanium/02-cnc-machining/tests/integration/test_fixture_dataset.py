@@ -1,4 +1,4 @@
-"""合成データセットがKAMP原本と同じ形状だから前処理・学習・feeder がコード変更なしに走るかどうか。"""
+"""합성 데이터셋이 KAMP 원본과 같은 모양이라 전처리·학습·feeder 가 코드 변경 없이 도는지."""
 import sys
 from pathlib import Path
 

@@ -2,11 +2,13 @@
 스펙 docs/specs/2026-09-15-cnc-loop-integration-test-design.md §3. 실데이터 불필요.
 실행: uv run pytest -m integration -q (공유 서버에서는 nice -n 19)."""
 import hashlib
+import re
 from pathlib import Path
 
 import pytest
 from mlflow.tracking import MlflowClient
 
+from lstm_ae.tracking import EXPERIMENT_NAME, REGISTERED_MODEL_NAME
 from monitoring.shadow_log import get_shadow_predictions
 
 pytestmark = pytest.mark.integration
@@ -26,7 +28,7 @@ def test_harness_bootstraps_champion_and_feeds_one_day(loop_factory):
     assert (loop.data_root / "timeline" / "temperature" / "day01_0.csv").exists()
 
 
-MODEL_NAME = "cnc-lstm-ae"
+MLFLOW_LOG_LINE = re.compile(r"^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} (INFO|WARNING) mlflow")
 
 
 def _md5(path: Path) -> str:
@@ -38,13 +40,13 @@ def _mlflow(loop) -> MlflowClient:
 
 
 def _scenario_runs(client: MlflowClient, scenario: str) -> list:
-    experiment = client.get_experiment_by_name(MODEL_NAME)
+    experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
     return client.search_runs([experiment.experiment_id], filter_string=f"tags.scenario = '{scenario}'")
 
 
 def _champion_version(client: MlflowClient) -> str:
     # MLflow SQL 저장소는 version 을 int 로 준다. serving 처럼 str 로 맞춰야 "1"·/health 와 비교가 성립한다.
-    return str(client.get_model_version_by_alias(MODEL_NAME, "champion").version)
+    return str(client.get_model_version_by_alias(REGISTERED_MODEL_NAME, "champion").version)
 
 
 def _all_batch_ids(days: int, batches_per_day: int = 5) -> list[str]:
@@ -53,7 +55,9 @@ def _all_batch_ids(days: int, batches_per_day: int = 5) -> list[str]:
 
 def _log_tail(loop) -> str:
     # 게이트·섀도우 판정 사유는 워커 로그에만 남는다. 흐름 단언이 깨지면 메시지에 붙인다(스펙 §3).
-    return loop.worker_log.read_text()[-4000:]
+    # 재학습마다 MLflow 자체 INFO/WARNING 줄이 십여 개씩 쌓이므로 빼야 꼬리에 판정 줄이 남는다.
+    lines = loop.worker_log.read_text(errors="replace").splitlines(keepends=True)
+    return "".join(line for line in lines if not MLFLOW_LOG_LINE.match(line))[-4000:]
 
 
 def test_shift_scenario_reaches_shadow_and_promotion(loop_factory):
@@ -67,6 +71,9 @@ def test_shift_scenario_reaches_shadow_and_promotion(loop_factory):
 
     days = loop.days()
     assert [d for d, *_ in days] == list(range(1, 13)), f"날짜가 빠지거나 순서가 어긋남\n{_log_tail(loop)}"
+    assert not any(flagged for day, _, flagged, _ in days if day <= 2), (
+        f"변형 전 Day 1·2 가 flagged(스펙 §2 여유): {days}\n{_log_tail(loop)}"
+    )
     actions = [action for *_, action in days]
     first_action_day = next((d for d, *_, action in days if action != "none"), None)
     assert first_action_day is not None and first_action_day >= 5, (
@@ -118,6 +125,9 @@ def test_fault_scenario_is_rejected_and_keeps_champion(loop_factory):
 
     days = loop.days()
     assert [d for d, *_ in days] == list(range(1, 9)), f"날짜가 빠지거나 순서가 어긋남\n{_log_tail(loop)}"
+    assert not any(flagged for day, _, flagged, _ in days if day <= 2), (
+        f"변형 전 Day 1·2 가 flagged(스펙 §2 여유): {days}\n{_log_tail(loop)}"
+    )
     actions = [action for *_, action in days]
     assert "rejected" in actions, f"{actions}\n{_log_tail(loop)}"
     assert "shadow_started" not in actions and "promoted" not in actions, f"{actions}\n{_log_tail(loop)}"
@@ -128,7 +138,8 @@ def test_fault_scenario_is_rejected_and_keeps_champion(loop_factory):
     for run in rejected:
         tags = run.data.tags
         assert "정상 라벨 없음" in tags["gate_reject_reason"], f"{tags['gate_reject_reason']}\n{_log_tail(loop)}"
-        assert tags["estimated_cause"] in {"tool_wear", "vibration_backlash"}
+        # 변형이 estimate_cause 의 TOOL_WEAR_FEATURES 컬럼만 키우므로 답은 구조적으로 tool_wear 다.
+        assert tags["estimated_cause"] == "tool_wear", tags
         assert "recommended_action" in tags  # RAG 없음 → 빈 문자열이지만 키는 남는다
 
     assert _champion_version(client) == "1"
