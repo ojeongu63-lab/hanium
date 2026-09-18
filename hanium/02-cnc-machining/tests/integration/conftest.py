@@ -52,8 +52,21 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _decoded(output: str | bytes | None) -> str:
+    """TimeoutExpired 의 stdout/stderr 는 text=True 여도 bytes 이거나 None 이다."""
+    if isinstance(output, bytes):
+        return output.decode(errors="replace")
+    return output or ""
+
+
 def run(cmd: list[str], env: dict, timeout: int = 600) -> subprocess.CompletedProcess:
-    result = subprocess.run(cmd, cwd=PROJECT, env=env, capture_output=True, text=True, timeout=timeout)
+    try:
+        result = subprocess.run(cmd, cwd=PROJECT, env=env, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise AssertionError(
+            f"{timeout}초 초과: {' '.join(cmd)}\n--- stdout\n{_decoded(exc.stdout)[-4000:]}"
+            f"\n--- stderr\n{_decoded(exc.stderr)[-4000:]}"
+        ) from exc
     if result.returncode != 0:
         raise AssertionError(
             f"실패: {' '.join(cmd)}\n--- stdout\n{result.stdout[-4000:]}\n--- stderr\n{result.stderr[-4000:]}"
@@ -63,7 +76,9 @@ def run(cmd: list[str], env: dict, timeout: int = 600) -> subprocess.CompletedPr
 
 def bootstrap(data_root: Path, extra_env: dict | None = None) -> dict:
     """합성 데이터셋 → 전처리 → 학습 → champion v1. 기존 스크립트 3개를 그대로 쓴다."""
-    env = {**os.environ, **LOOP_ENV, "CNC_DATA_ROOT": str(data_root), "PYTHONUNBUFFERED": "1"}
+    # 개발자 셸의 CNC_* 가 LOOP_ENV·extra_env 에 없는 상수로 섞여 들지 않게 먼저 걷어 낸다.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("CNC_")}
+    env.update({**LOOP_ENV, "CNC_DATA_ROOT": str(data_root), "PYTHONUNBUFFERED": "1"})
     env.pop("OPENAI_API_KEY", None)  # 셸에 키가 있어도 통합 테스트는 LLM 을 부르지 않는다
     env.update(extra_env or {})
     write_dataset(data_root / "dataset" / DATASET_DIRNAME)
@@ -115,7 +130,9 @@ class Loop:
             if self.server.poll() is not None:
                 break
             time.sleep(0.5)
-        raise AssertionError(f"서버가 /health 200 을 내지 않음\n{self.server_log.read_text()[-4000:]}")
+        raise AssertionError(
+            f"서버가 /health 200 을 내지 않음\n{self.server_log.read_text(errors='replace')[-4000:]}"
+        )
 
     def start_worker(self) -> None:
         self.worker = subprocess.Popen(
@@ -137,7 +154,7 @@ class Loop:
 
     def days(self) -> list[tuple[int, float, bool, str]]:
         out = []
-        for line in self.worker_log.read_text().splitlines():
+        for line in self.worker_log.read_text(errors="replace").splitlines():
             m = DAY_LINE.match(line)
             if m:
                 out.append((int(m[1]), float(m[2]), m[3] == "True", m[4]))
@@ -150,10 +167,14 @@ class Loop:
                 return
             if self.worker.poll() is not None:
                 raise AssertionError(
-                    f"워커가 종료됨 (exit {self.worker.returncode})\n{self.worker_log.read_text()[-4000:]}"
+                    f"워커가 종료됨 (exit {self.worker.returncode})\n"
+                    f"{self.worker_log.read_text(errors='replace')[-4000:]}"
                 )
             time.sleep(0.2)
-        raise AssertionError(f"워커가 {timeout}초 안에 Day {day:02d} 를 처리하지 않음\n{self.worker_log.read_text()[-4000:]}")
+        raise AssertionError(
+            f"워커가 {timeout}초 안에 Day {day:02d} 를 처리하지 않음\n"
+            f"{self.worker_log.read_text(errors='replace')[-4000:]}"
+        )
 
     def run_days(self, days: int) -> None:
         for day in range(1, days + 1):
@@ -172,6 +193,7 @@ class Loop:
                 proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 proc.kill()
+                proc.wait(timeout=5)
         for handle in self._handles:
             handle.close()
 
