@@ -18,6 +18,18 @@ def _clear_overrides():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def _isolate_monitoring_state(tmp_path, monkeypatch):
+    """실제 data/monitoring DB 에 쓰지 않게 테스트마다 격리한다. /start-shadow 는 전역을 직접 바꾸므로
+    되돌려 두지 않으면 뒤 테스트의 /predict 가 섀도우를 실제 shadow.db 에 기록한다.
+    테스트가 같은 값을 다시 monkeypatch 하면 그쪽이 이긴다."""
+    import serving.app as app_module
+
+    monkeypatch.setattr(app_module, "_shadow_state", None)
+    monkeypatch.setattr(app_module, "DB_PATH", tmp_path / "requests.db")
+    monkeypatch.setattr(app_module, "SHADOW_DB", tmp_path / "shadow.db")
+
+
 def _fake_state(window_size: int = 6, threshold: float = 1.0) -> ModelState:
     torch.manual_seed(0)
     model = LSTMAutoencoder(num_features=len(FEATURE_COLUMNS), hidden_size=4, latent_dim=2)
