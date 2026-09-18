@@ -61,9 +61,10 @@ def _log_tail(loop) -> str:
 
 
 def test_shift_scenario_reaches_shadow_and_promotion(loop_factory):
-    """라벨은 전부 정상, Day 3 부터 위치 3축이 8σ 계단 이동 → 트리거 → 재학습 → 게이트 통과 →
-    섀도우 → 승격. 판정의 옳고 그름이 아니라 배관이 승격 끝까지 닿는지 본다(스펙 §3)."""
-    loop = loop_factory("temperature", {"CNC_POS_DRIFT": "8", "CNC_CUR_DRIFT": "1.0"})
+    """라벨은 전부 정상, Day 3 부터 위치 3축이 2σ, X·Y축 전류·전력이 15% 계단 이동 → 트리거 → 재학습 →
+    게이트 통과 → 섀도우 → 승격. 판정의 옳고 그름이 아니라 배관이 승격 끝까지 닿는지 본다(스펙 §3).
+    변화 크기는 실제 운영과 같은 수준으로 잡았다: 비율 약 2.05(9월 2일 실데이터 온도 40일째 1.80)."""
+    loop = loop_factory("temperature", {"CNC_POS_DRIFT": "2", "CNC_CUR_DRIFT": "0.15"})
     model_before = _md5(loop.data_root / "model" / "model.pt")
     scaler_before = _md5(loop.data_root / "processed" / "scaler.json")
 
@@ -115,9 +116,10 @@ def test_shift_scenario_reaches_shadow_and_promotion(loop_factory):
 
 
 def test_fault_scenario_is_rejected_and_keeps_champion(loop_factory):
-    """Day 3 부터 스핀들 부하 계단 상승 + QC 불합격 라벨 → 트리거 → 재학습 → G2 창에 정상 라벨이
-    없어 거부 → 원인 추정 태그. champion 과 정본 파일은 그대로(스펙 §3)."""
-    loop = loop_factory("tool_wear", {"CNC_WEAR_RATE": "20"})
+    """Day 3 부터 스핀들 부하가 배치 안에서 최대 30% 오르는 계단 변형 + QC 불합격 라벨 → 트리거 → 재학습 →
+    G2 창에 정상 라벨이 없어 거부 → 원인 추정 태그. champion 과 정본 파일은 그대로(스펙 §3).
+    변화 크기는 실제 운영과 같은 수준으로 잡았다: 비율 약 2.8(9월 2일 실데이터 공구마모 40일째 3.08)."""
+    loop = loop_factory("tool_wear", {"CNC_WEAR_RATE": "0.3"})
     model_before = _md5(loop.data_root / "model" / "model.pt")
     scaler_before = _md5(loop.data_root / "processed" / "scaler.json")
 
