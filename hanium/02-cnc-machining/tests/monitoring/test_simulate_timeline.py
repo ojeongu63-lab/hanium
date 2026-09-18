@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -78,3 +79,25 @@ def test_serve_url_mode_feeds_only_requested_day_range(monkeypatch, tmp_path):
 
     assert fed == [5, 6]
     assert (tmp_path / "timeline" / "temperature").is_dir()
+
+
+def test_feed_day_labels_the_day_only_after_all_batches_are_posted(monkeypatch, tmp_path):
+    # 워커는 labels.db 의 최신 produced_day 를 시계로 쓴다. 배치마다 라벨을 적으면 그날 첫 배치
+    # 직후 그날을 처리해 버려, 드리프트 창이 그날 배치 일부만으로 계산된다.
+    events = []
+
+    class FakeClient:
+        def post(self, url, files):
+            events.append(("post", files["file"][0]))
+            return SimpleNamespace(raise_for_status=lambda: None)
+
+    monkeypatch.setattr(st, "BATCHES_PER_DAY", 3)
+    monkeypatch.setattr(st, "generate_batch", lambda day, index, scenario: pd.DataFrame({"x": [index]}))
+    monkeypatch.setattr(st, "record_label", lambda batch_id, **kwargs: events.append(("label", batch_id)))
+
+    st.feed_day(FakeClient(), day=1, scenario="temperature", out_dir=tmp_path)
+
+    assert events == [
+        ("post", "day01_0.csv"), ("post", "day01_1.csv"), ("post", "day01_2.csv"),
+        ("label", "day01_0"), ("label", "day01_1"), ("label", "day01_2"),
+    ]

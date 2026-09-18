@@ -162,7 +162,12 @@ def generate_batch(day: int, index: int, scenario: str) -> pd.DataFrame:
 def feed_day(client, day: int, scenario: str, out_dir: Path) -> None:
     """하루치 배치를 생성해 /predict 로 흘려보내고 라벨을 기록한다.
     감시는 하지 않는다 — --serve-url 모드에서는 drift_worker.py 가 별도
-    프로세스로 폴링하며 감시한다."""
+    프로세스로 폴링하며 감시한다.
+
+    라벨은 그날 배치를 전부 보낸 뒤에 기록한다. 워커는 labels.db 의 최신 produced_day 를
+    시계로 쓰므로, 배치마다 라벨을 적으면 그날 첫 배치 직후 그날을 처리해 드리프트 창을
+    그날 배치 일부로 계산한다(실측: 5배치 중 3개가 들어간 시점에 그날을 처리)."""
+    labels = []
     for index in range(BATCHES_PER_DAY):
         batch_id = f"day{day:02d}_{index}"
         batch = generate_batch(day, index, scenario)
@@ -174,12 +179,14 @@ def feed_day(client, day: int, scenario: str, out_dir: Path) -> None:
                 "/predict", files={"file": (csv_path.name, fh, "text/csv")}
             )
         response.raise_for_status()
+        labels.append((batch_id, true_label(scenario, day)))
 
+    for batch_id, label in labels:
         record_label(
             batch_id=batch_id,
             produced_day=day,
             arrived_day=day + LABEL_DELAY_DAYS,
-            label=true_label(scenario, day),
+            label=label,
             db_path=LABELS_DB,
         )
 
