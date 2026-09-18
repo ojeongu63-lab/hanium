@@ -232,9 +232,9 @@ def main() -> None:
     from fastapi.testclient import TestClient
     from serving.app import app
 
-    from drift_worker import WorkerState, tick  # 같은 폴더
+    from drift_worker import WorkerState, load_champion_missed, tick  # 같은 폴더
 
-    state = WorkerState()
+    state = WorkerState(champion_missed=load_champion_missed())
 
     # with 블록이어야 lifespan 이 돌아 champion 모델이 로드된다
     # (simulate_drift.py 와 같은 관례). 없으면 /predict 가 503 을 낸다.

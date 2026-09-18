@@ -16,9 +16,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from mlflow.tracking import MlflowClient  # noqa: E402
 
+from config import CONSECUTIVE_K, COOLDOWN_DAYS, DATA_ROOT, GATE_SAMPLE_SIZE  # noqa: E402
 from lstm_ae.tracking import (  # noqa: E402
     CHAMPION_ALIAS,
     REGISTERED_MODEL_NAME,
+    configure_tracking,
     promote_to_champion,
 )
 from retraining.gate import evaluate_gate, evaluate_two_sided  # noqa: E402
@@ -28,16 +30,14 @@ from retraining.trigger import days_to_process, is_drift_flagged, should_retrain
 from monitoring.cause_estimation import estimate_cause  # noqa: E402
 from rag.guide import build_cause_guide  # noqa: E402
 
-LABELS_DB = ROOT / "data" / "monitoring" / "labels.db"
-REQUESTS_DB = ROOT / "data" / "monitoring" / "requests.db"
-MODEL_DIR = ROOT / "data" / "model"
-SCALER_PATH = ROOT / "data" / "processed" / "scaler.json"
-BACKUP_ROOT = ROOT / "data" / "model_backup"
-SHADOW_DB = ROOT / "data" / "monitoring" / "shadow.db"
-COOLDOWN_DAYS = 5
-CONSECUTIVE_K = 3
-# G2 평가에 쓸 최근 라벨 도착 배치 수(= 최근 4일치). 두 모델을 전부 재추론하므로
-# 상한을 둔다.
+LABELS_DB = DATA_ROOT / "monitoring" / "labels.db"
+REQUESTS_DB = DATA_ROOT / "monitoring" / "requests.db"
+MODEL_DIR = DATA_ROOT / "model"
+SCALER_PATH = DATA_ROOT / "processed" / "scaler.json"
+BACKUP_ROOT = DATA_ROOT / "model_backup"
+SHADOW_DB = DATA_ROOT / "monitoring" / "shadow.db"
+# COOLDOWN_DAYS(5)·CONSECUTIVE_K(3)·GATE_SAMPLE_SIZE(20)는 config.py 에서 온다(환경변수 CNC_*).
+# GATE_SAMPLE_SIZE(기본 20)의 근거 — config.py 에서 읽는다.
 #
 # 60으로 올려봤다가 20으로 되돌린 값이다. 표본이 작다는 문제의식으로 넓혔더니
 # 시나리오 A 가 승격에서 거부로 뒤집혔다 — Day 37 기준 G2 가 0.95 vs 0.60 에서
@@ -51,7 +51,6 @@ CONSECUTIVE_K = 3
 #
 # 표본 20건이 통계적으로 넉넉해서가 아니라, 넓히면 측정 대상 자체가
 # 바뀌기 때문에 이 값을 쓴다. 이 민감도는 알려진 한계다.
-GATE_SAMPLE_SIZE = 20
 
 
 @dataclass
@@ -68,13 +67,28 @@ class ShadowState:
 
 @dataclass
 class WorkerState:
+    champion_missed: int                    # champion run 의 mean_fn — load_champion_missed() 로 읽는다
     flag_history: list[bool] = field(default_factory=list)
     cooldown_remaining: int = 0
-    champion_missed: int = 1                # 현 champion 실측 — 불량 11개 중 1개 놓침
     champion_accuracy: float = 0.0          # 첫 게이트 평가 시 측정값으로 대체
     shadow: ShadowState | None = None
     rag_corpus: list[dict] | None = None
     openai_client: object | None = None
+
+
+def champion_missed_from_metrics(metrics: dict) -> int:
+    """G1 기준 — champion 이 원본 eval 에서 놓친 불량 수. build_run_metrics 가 모든 run 에
+    mean_fn 으로 기록한다. 예전엔 1 로 박혀 있어 champion 이 바뀌면 기준이 틀어졌다."""
+    if "mean_fn" not in metrics:
+        raise KeyError("champion run 에 mean_fn 지표가 없습니다 — G1 기준을 정할 수 없습니다")
+    return int(metrics["mean_fn"])
+
+
+def load_champion_missed() -> int:
+    configure_tracking()
+    client = MlflowClient()
+    mv = client.get_model_version_by_alias(REGISTERED_MODEL_NAME, CHAMPION_ALIAS)
+    return champion_missed_from_metrics(client.get_run(mv.run_id).data.metrics)
 
 
 def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
@@ -95,10 +109,10 @@ def tick(client, state: WorkerState, current_day: int, scenario: str) -> dict:
 
     print(f"  [Day {current_day}] 트리거 발동 — 재학습 시작", flush=True)
     result = run_retraining(
-        timeline_dir=ROOT / "data" / "timeline" / scenario,
+        timeline_dir=DATA_ROOT / "timeline" / scenario,
         labels_db=LABELS_DB,
         current_day=current_day,
-        data_root=ROOT / "data",
+        data_root=DATA_ROOT,
     )
     state.cooldown_remaining = COOLDOWN_DAYS
 
@@ -252,7 +266,7 @@ def _gate_predictions(
     if not arrived:
         return [], [], [], []
 
-    timeline_dir = ROOT / "data" / "timeline" / scenario
+    timeline_dir = DATA_ROOT / "timeline" / scenario
     batch_paths = [timeline_dir / f"{r['batch_id']}.csv" for r in arrived]
     truths = [r["label"] for r in arrived]
 
@@ -395,7 +409,8 @@ def main() -> None:
     parser.add_argument("--poll-interval", type=float, default=5.0, help="폴링 주기(초)")
     args = parser.parse_args()
 
-    state = WorkerState()
+    state = WorkerState(champion_missed=load_champion_missed())
+    print(f"champion G1 기준: 원본 eval 놓침 {state.champion_missed}건", flush=True)
     state.rag_corpus, _, state.openai_client = load_rag_state()
     last_day = 0
 

@@ -148,3 +148,33 @@ def test_feeder_follows_config(tmp_path):
     assert got["pos_drift"] == 8.0
     assert got["flip"] == 3
     assert got["progress_9"] == 1.0
+
+
+WORKER_WIRING = f"""
+import json, sys
+sys.path.insert(0, {MONITORING_DIR!r})
+import drift_worker as dw
+print(json.dumps({{
+    "labels_db": str(dw.LABELS_DB),
+    "model_dir": str(dw.MODEL_DIR),
+    "backup_root": str(dw.BACKUP_ROOT),
+    "gate_sample": dw.GATE_SAMPLE_SIZE,
+    "cooldown": dw.COOLDOWN_DAYS,
+    "k": dw.CONSECUTIVE_K,
+}}))
+"""
+
+
+def test_worker_follows_config(tmp_path):
+    got = _run_snippet(WORKER_WIRING, {
+        "CNC_DATA_ROOT": str(tmp_path),
+        "CNC_GATE_SAMPLE_SIZE": "5",
+        "CNC_COOLDOWN_DAYS": "2",
+        "CNC_CONSECUTIVE_K": "2",
+    })
+
+    root = str(tmp_path)
+    assert got["labels_db"] == f"{root}/monitoring/labels.db"
+    assert got["model_dir"] == f"{root}/model"
+    assert got["backup_root"] == f"{root}/model_backup"
+    assert (got["gate_sample"], got["cooldown"], got["k"]) == (5, 2, 2)
