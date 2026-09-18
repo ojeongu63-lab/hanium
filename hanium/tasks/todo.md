@@ -652,6 +652,7 @@ pull 받아 미팅하되 실시간까지 준비.
   - `/drift-status`가 champion run에 지표를 적으므로 실데이터 스모크는 `mlflow.db`까지 백업·복원했다.
   - 최종 리뷰로 넘긴 것: 섀도우 종료 시 `trigger_day` 태그 덮어쓰기, 단위 스위트가 실제 `shadow.db`에 매번
     2행 기록(`test_app.py` 격리 누수, 지금 46행).
+- 최종 리뷰 수정 웨이브: 324f595·3f3dbe1·9667d67·839212d·66767e4 — shadow.db 누수 차단·정리, trigger_day 태그, 단언 강화, 하네스 보강
 - 배운 것: 계획서 속 테스트 코드도 돌려 보기 전엔 가설이다. 반환 형태를 바꾸면 모든 호출부를 grep한다.
   둘 다 `tasks/lessons.md`.
 - 남은 일: CI 결과 확인(push 후), 개인 PC 에서 `docker compose build` 와 `--profile demo` 리허설

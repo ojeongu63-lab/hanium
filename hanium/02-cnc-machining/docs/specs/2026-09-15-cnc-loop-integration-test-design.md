@@ -329,6 +329,8 @@ push 전). 완료 기준 6개 중 1·2·5·6은 충족했고, 3(CI)·4(docker PC
 - **계획에 없던 테스트 보강.** 핵심 단언 메시지에 워커 로그 꼬리(§3 "워커 로그는 실패 시 pytest 출력에
   붙인다"), `next(..., None)` 가드, 설치된 `model.pt`·`scaler.json`이 같은 `retrain/<ts>` 한 곳의 것인지
   보는 쌍 검증.
+- **§3 부트스트랩은 session 픽스처가 아니라 테스트마다 돈다.** function 스코프 `loop_factory`가 테스트마다
+  임시 데이터 루트를 따로 만들어 부트스트랩하며, 시나리오마다 데이터 루트가 격리되는 것은 이 덕분이다.
 - **그 밖.** 통합 테스트는 §3의 2개에 하네스 스모크 1개(계획 Task 7)를 더해 3개. README에 §1 환경변수 표와
   통합 테스트 실행법(계획은 한 줄). compose는 serving이 `cnc-serving` 이미지를 빌드하고 worker·feeder가 같은
   이미지를 쓴다(`pull_policy: never` 추가). STRUCTURE 테스트 수는 단위 229·통합 3.
@@ -340,3 +342,13 @@ push 전). 완료 기준 6개 중 1·2·5·6은 충족했고, 3(CI)·4(docker PC
   - 섀도우가 끝날 때 워커가 `trigger_day` 태그를 섀도우 종료일로 덮어쓴다. 승격 run이 5가 아니라 7로 남는다.
   - 기본 단위 스위트가 실제 `data/monitoring/shadow.db`에 매 실행 2행을 쓴다(`tests/serving/test_app.py`
     격리 누수). 지금 46행, 전부 `batch_id='experiment'`.
+- **최종 리뷰 수정 웨이브(324f595·3f3dbe1·9667d67·839212d·66767e4).** 위 두 문제를 고쳤다.
+  - `shadow.db` 누수: `test_app.py`의 autouse 픽스처가 `_shadow_state`·`DB_PATH`·`SHADOW_DB`를 테스트마다
+    격리한다. 실제 파일의 누수 행(RED 확인 실행분 포함 48행, 전부 `experiment`)은 지웠고, 지우기 전 사본(46행)은
+    `data/monitoring/_shadow_db_leak_20260918.db`. 수정 뒤 기본 스위트를 돌려도 0행, `requests.db`는 8행 그대로.
+  - `trigger_day`: `ShadowState`가 트리거한 날을 들고 있다가 섀도우 판정 태그에 쓴다. 승격 테스트가
+    `trigger_day == "5"`를 단언한다(수정 전 "7"로 실패).
+  - 단언 강화: 거부 run의 `estimated_cause == "tool_wear"`(변형이 `TOOL_WEAR_FEATURES` 컬럼만 키운다), 두 루프
+    테스트에 Day 1·2 flag 없음(§2 여유), 실패 메시지의 워커 로그 꼬리에서 MLflow INFO/WARNING 줄 제외. 하네스는
+    셸의 `CNC_*` 차단, 로그 `errors="replace"`, kill 뒤 reap, 시간 초과 시 부분 출력을 붙인 실패로 보강했다.
+  - 수정 뒤 `uv run pytest -q` 229 passed·3 deselected, `uv run pytest -m integration -q`(nice) 3 passed 158.9초.

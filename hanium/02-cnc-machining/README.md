@@ -276,11 +276,12 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
 
 ```bash
 cd 02-cnc-machining
-SCENARIO=temperature DAYS=40 PACE=15 docker compose --profile demo up --abort-on-container-exit
+SCENARIO=temperature DAYS=40 PACE=15 docker compose --profile demo up
 ```
 
 - `serving`(8000 포트) → healthy 가 되면 `worker`, `feeder` 가 순서대로 뜬다. `--profile demo` 를
   빼면 feeder 없이 서빙 + 워커만 뜬다(실트래픽을 직접 넣을 때).
+- feeder 가 끝나도 서빙·워커는 계속 돈다(섀도우가 아직 진행 중일 수 있다). 멈출 때는 `docker compose down`.
 - 루프 상수·경로는 `CNC_*` 환경변수로 바꿀 수 있다(`src/config.py`). 없으면 기본값 — 이 절의
   설명과 같다.
 
@@ -291,7 +292,7 @@ SCENARIO=temperature DAYS=40 PACE=15 docker compose --profile demo up --abort-on
   | `CNC_CONSECUTIVE_K` | 3 | 연속 flagged 횟수(트리거 조건) |
   | `CNC_COOLDOWN_DAYS` | 5 | 재트리거 쿨다운 일수 |
   | `CNC_GATE_SAMPLE_SIZE` | 20 | 게이트 검증 표본 수 |
-  | `CNC_TOTAL_DAYS` | 40 | feeder 가 도는 총 일수 |
+  | `CNC_TOTAL_DAYS` | 40 | 변형 진행도가 1.0 에 닿는 날(램프 분모 `TOTAL_DAYS − DRIFT_START_DAY`). feeder `--days` 의 기본값이기도 하다 — 실제로 며칠을 보낼지는 `--days`(compose 는 `DAYS`)가 정한다 |
   | `CNC_BATCHES_PER_DAY` | 5 | 하루 배치 수 |
   | `CNC_DRIFT_START_DAY` | 10 | 변형이 시작되는 날 |
   | `CNC_LABEL_DELAY_DAYS` | 7 | 라벨 도착까지 지연일 |
