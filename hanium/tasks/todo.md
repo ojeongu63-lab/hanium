@@ -683,3 +683,14 @@ Day 7 v2 승격 → 이후 0.36~0.49, 거부 경로 Day 5·7 "정상 라벨 없�
 
 사용자 결정: `test/` 폴더에 올려 두었던 AI-Hub 기계시설물·NASA Milling 샘플로 두 번째 트랙을 만드는 계획은
 취소한다. 폴더도 삭제됨. 데이터셋은 기존 KAMP CNC 22실험 그대로 간다.
+
+## main 병합 · CI 첫 실행 (2026-09-21)
+
+- [x] 단위 테스트 재확인 → 229 passed·3 deselected, 34.5초
+- [x] `loop-integration-test` → `main` fast-forward 병합(27커밋, `cbc7a7f..1f46527`)
+- [x] `origin/main` push → 확인: CI 3개 job 전부 success
+      [run 35549348692](https://github.com/ojeongu63-lab/hanium/actions/runs/35549348692)
+      (`test` 55초, `loop-integration` 132초, `docker-build` 27초 — 셋 다 첫 실행)
+- [x] 결과를 스펙 "실행 결과에 따른 정정" 절에 기록
+- 병합된 로컬 브랜치 `loop-integration-test` 삭제(커밋은 main 에 있음, 원격에는 올린 적 없음)
+- 남은 일: docker 있는 PC 에서 `docker compose --profile demo up` 기동 리허설, 위 후속 과제 5건

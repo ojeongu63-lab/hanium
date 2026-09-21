@@ -365,3 +365,13 @@ push 전). 완료 기준 6개 중 1·2·5·6은 충족했고, 3(CI)·4(docker PC
 
   3회 연속 실행 모두 3 passed(162~181초), 두 경로의 워커 Day 줄이 세 번 모두 같았다. Day 1·2는 0.62·0.45로
   변함없다. 판정 흐름은 처음 값과 같고 비율만 실제 운영과 같은 범위로 들어왔다.
+
+- **CI 3개 job 이 GitHub 에서 실제로 돌았다(2026-09-21).** 브랜치 `loop-integration-test` 를 `main` 에
+  fast-forward 병합해 27커밋을 push 한 결과:
+  [run 35549348692](https://github.com/ojeongu63-lab/hanium/actions/runs/35549348692) — `test` 55초,
+  `loop-integration` 132초(이 서버 152~181초), `docker-build` 27초, 전부 success. 셋 다 첫 실행이다.
+  `docker compose build` 는 지금까지 어디서도 돈 적이 없었는데 한 번에 통과했다 — `pyproject.toml` 이
+  torch 를 CPU 전용 인덱스로 고정해 둬서 휠이 작고, Dockerfile 의 `uv sync --frozen --no-dev` 두 층이
+  모두 성공해야 exit 0 이므로 27초는 정상 빌드다(실패하면 job 이 빨간불이 된다).
+  남은 것은 `docker compose --profile demo up` 실행 리허설 — 빌드가 아니라 3개 컨테이너 기동·볼륨
+  확인이라 docker 가 있는 PC 에서 해야 한다.
