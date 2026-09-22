@@ -722,3 +722,14 @@ frozen LSTM CSV API 재사용), 이번엔 fault·guide·versions·모델 버전 
 - [x] `CNC_DATA_ROOT` 절대경로 자동 보정 테스트로 근거 제시(다른 머신에 복사해도 됨)
 - [x] 핸드오버 문서의 "41개" 표기(feature_contributions 개수) 40개로 수정 — 로컬 파일만(코드 변경 없음, 팀원도 요청 안 함)
 - 미해결: 이전에 공유한 claude.ai 아티팩트 링크는 계정 전환으로 이 세션에서 더 이상 못 고침(팀원 회신에 필요 없다고 함 — 급하지 않음)
+
+## 경계 샘플 교체: exp22 → exp06 (2026-09-23)
+
+사용자 지적으로 경계 샘플을 exp22에서 exp06으로 교체. 다시 실행해 보니 exp06이 실제로 더 나은
+경계 사례였다: score 0.8584 vs threshold 0.8566(비율 1.002) — 임계값을 간신히 넘겨 판정이 뒤집히기
+직전인 진짜 경계. `fault.verdict`도 세 단계 중 가장 약한 `weak`(약한 신호, top_z 4.18)로 exp07·exp22와
+다른 검증 tier를 보여준다. exp22(비율 2.3, 정상 라벨을 불량으로 오판)는 임계값 근처가 아니라 오분류
+사례였다.
+
+- [x] exp06 predict 재실행(RAG on/off) → RAG off 0.16초, RAG on 3.27초
+- [x] 번들 predict-samples 교체(`boundary_experiment06.json`), README·SHA256SUMS 갱신
