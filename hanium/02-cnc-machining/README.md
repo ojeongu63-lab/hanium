@@ -376,6 +376,8 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 
 > 세 단계 흐름과 폴더 역할을 한 장으로 정리한 문서가 따로 있다 —
 > **[`docs/STRUCTURE.md`](docs/STRUCTURE.md)**. 처음 보는 사람에게 공유하기 좋다.
+> 모델링·MLOps 인프라·재학습 루프까지 왜 이렇게 만들었는지 설명하는 문서는
+> **[`docs/HANDOVER.md`](docs/HANDOVER.md)**.
 
 폴더가 두 종류로 나뉜다. **`src/`는 import해서 쓰는 라이브러리 코드**이고,
 **최상위의 나머지 폴더들은 각각 하나의 일회성 분석**으로, 실행 스크립트와 그
