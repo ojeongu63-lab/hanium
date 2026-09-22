@@ -705,3 +705,20 @@ Day 7 v2 승격 → 이후 0.36~0.49, 거부 경로 Day 5·7 "정상 라벨 없�
 - [x] 팀원용 설명 페이지 작성 — 구조·판정 흐름·API 계약·샘플 응답·현재 상태·질문 9건
       https://claude.ai/artifact/8tnqvDk52d6QkJDR3dTCni (비공개 — Share 로 팀원에게 열어 줘야 보임)
 - [ ] 입력 형태 답 받은 뒤: JSON 엔드포인트 추가 여부 결정 → 설계 → 구현
+
+## 팀 연동 1차 답변 (2026-09-23)
+
+팀원이 계약 확정 답변 + 실행 증거 요청으로 회신. 스프링 연결은 이미 검증된 상태(기존
+frozen LSTM CSV API 재사용), 이번엔 fault·guide·versions·모델 버전 관리만 맞추면 됨.
+새 기능 요청 없음.
+
+- [x] commit 확인 — main HEAD `2e2bdfe`, CI 그린(83eb685)과 02-cnc-machining 아래 diff 0 → 검증 상태 그대로 적용됨
+- [x] 실제 서버 기동(로컬 uvicorn, champion v1) 후 `/health` + 정상(exp12)·이상(exp07)·경계(exp22, 문서화된 FP 사례) predict 재실행, RAG on/off 각각 측정
+      - contributions 40개 확인(S_SystemInertia 랭킹 제외) — 팀원 지적이 맞음
+      - RAG off: 0.09~0.5초 / RAG on: exp07 9.0초, exp22 2.8초, exp12 0.28초(good은 LLM 호출 없음)
+      - 09-15에 측정한 4.4초는 exp07을 60배 이어 붙인 33,900행 스트레스 입력 — 정상 크기 입력과는 다른 수치임을 확인해 회신
+- [x] MLflow 레지스트리 조회 — champion 여전히 v1(원본), v2~v6은 과거 실데이터 리허설의 재학습·게이트 산출물(하나는 promoted였다가 원상복구), 재학습 배관이 실데이터에서도 실제로 돈 증거로 제시
+- [x] serving 최소 파일셋 확인(코드 근거로 필수/폴백/불필요 구분) → `data.tar.gz`(23M, dataset·processed·model·mlflow·rag) + predict 샘플 3개 + README 로 패키징, `/home/sure/cnc-serving-bundle-2e2bdfe/`, SHA256SUMS.txt 포함, 비밀값 없음 확인
+- [x] `CNC_DATA_ROOT` 절대경로 자동 보정 테스트로 근거 제시(다른 머신에 복사해도 됨)
+- [x] 핸드오버 문서의 "41개" 표기(feature_contributions 개수) 40개로 수정 — 로컬 파일만(코드 변경 없음, 팀원도 요청 안 함)
+- 미해결: 이전에 공유한 claude.ai 아티팩트 링크는 계정 전환으로 이 세션에서 더 이상 못 고침(팀원 회신에 필요 없다고 함 — 급하지 않음)
