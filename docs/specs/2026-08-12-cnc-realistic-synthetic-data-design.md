@@ -1,7 +1,7 @@
 # CNC 합성 데이터 현실성 보정 설계
 
 - 날짜: 2026-08-12
-- 상태: 설계 완료, 구현 전
+- 상태: 구현 완료 (2026-09-30 기준)
 - 대체 대상: `2026-08-12-cnc-synthetic-anomaly-scenarios-design.md`(이상 시나리오),
   `2026-08-12-cnc-drift-monitoring-design.md`의 "검증 — 합성 점진적 드리프트
   시뮬레이션" 절
