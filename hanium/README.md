@@ -70,8 +70,7 @@ cd 02-cnc-machining && uv sync && uv run pytest
 ```
 hanium/
 ├── README.md                      이 문서
-├── 02-cnc-machining/              본 결과물
-└── tasks/                         작업 계획·기록
+└── 02-cnc-machining/              본 결과물
 ```
 
 `data/`는 원본 데이터·학습된 모델·MLflow 기록이 들어있어 git에 포함되지 않는다.

@@ -243,8 +243,8 @@ def main() -> None:
 
     state = WorkerState(champion_missed=load_champion_missed())
 
-    # with 블록이어야 lifespan 이 돌아 champion 모델이 로드된다
-    # (simulate_drift.py 와 같은 관례). 없으면 /predict 가 503 을 낸다.
+    # with 블록이어야 lifespan 이 돌아 champion 모델이 로드된다.
+    # 없으면 /predict 가 503 을 낸다.
     with TestClient(app) as client:
         for day in range(args.start_day, args.days + 1):
             feed_day(client, day, args.scenario, out_dir)

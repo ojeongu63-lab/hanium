@@ -269,8 +269,8 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
   함께 한다 — 실측 시나리오 A/B 재현에 쓴 방식이 이것이다.
 - 진행 경과와 실측 결과(시나리오 A: 승격, 시나리오 B: 5회 모두 거부,
   fixture_loosening: 거부 3회 뒤 4번째가 게이트 통과 — 원인 추정은 두
-  시나리오 합쳐 8/8 정답)는 [`../tasks/todo.md`](../tasks/todo.md)와 각
-  스펙의 "실행 결과에 따른 정정" 절에 기록돼 있다.
+  시나리오 합쳐 8/8 정답)는 각 스펙의 "실행 결과에 따른 정정" 절에
+  기록돼 있다.
 
 **docker compose로 같은 것을 한 명령으로** (docker 가 있는 PC — 이미지 안에 코드·의존성, `data/`는 볼륨):
 
@@ -406,10 +406,9 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 | `demo/` | 미팅 데모 페이지 생성 (§2-9) | `demo/index.html` (커밋됨) |
 | `loocv/` | 정상 실험 LOOCV 검증 (§2-5) | `loocv/summary.{json,csv}` |
 | `synthetic/` | 데모용 합성 이상 시나리오 생성 (§2-6) | `synthetic/scenarios/*.csv` |
-| `augmentation/` | 희소 샘플 증강 실험 | `augmentation/combined_dataset/` (git 제외) |
 | `monitoring/` | 드리프트 시뮬레이션 + 자동 재학습 감시 워커 (§2-7) | `data/timeline/`, `data/monitoring/` |
 
-`loocv/`, `synthetic/`, `augmentation/`, `monitoring/`은 **검증·실험용이라 서빙
+`loocv/`, `synthetic/`, `monitoring/`은 **검증·실험용이라 서빙
 경로에 영향을 주지 않는다.** 서버를 띄우고 `/predict`를 쓰는 데는 `src/`,
 `scripts/`, `data/`만 있으면 된다.
 
@@ -417,7 +416,7 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 
 | 경로 | 내용 |
 |---|---|
-| `docs/specs/`, `docs/plans/` | 설계 스펙 / 구현 계획 문서 |
+| `docs/specs/` | 설계 스펙 |
 | `data/` | 원본·전처리·모델·MLflow 기록 (git 제외, §1-2 참고) |
 | `Dockerfile`, `.dockerignore` | 서빙 앱 컨테이너화 (§2-8) |
 
