@@ -11,7 +11,7 @@
 import os
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent  # 02-cnc-machining/
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # 저장소 루트
 
 
 def _env_int(name: str, default: int) -> int:

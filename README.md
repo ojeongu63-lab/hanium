@@ -1,16 +1,21 @@
-# 02 · CNC 가공 이상탐지 MLOps (본 결과물)
+# CNC 가공 이상탐지 MLOps (한이음)
 
-CNC 가공 데이터로 LSTM-Autoencoder 기반 비지도 이상탐지 모델을 학습하고,
-MLflow(sqlite 백엔드)로 실험을 추적·관리하며, FastAPI로 champion 모델을
-서빙하는 프로젝트.
+CNC 가공 설비의 공정 센서 데이터로 **불량을 사전에 잡아내는 비지도 이상탐지
+시스템**. 정상 데이터만으로 LSTM-Autoencoder를 학습해 "평소와 다른 패턴"을
+재구성 오차로 검출하고, MLflow(sqlite 백엔드)로 실험을 추적·관리하며, FastAPI로
+champion 모델을 서빙한다. 불량으로 판정되면 **현장 조치 가이드까지 생성**한다.
 
 **성능: precision 0.91 / recall 0.91** (eval 14개 실험 — TP 10 / FP 1 / FN 1 / TN 2,
 p95 임계값 기준). 정상 실험 11개 LOOCV에서도 9개를 정상으로 맞춰, 고정 분할
-결과가 우연이 아님을 확인했다.
+결과가 우연이 아님을 확인했다. 임계값은 정상(train) 데이터의 오차 분포로만 정하고
+라벨에서 역산하지 않는다.
 
-이 LSTM-AE 방법론은 원래 다른 제조공정 데이터에 먼저 적용해봤다가, **CNC
-가공 데이터에 재적용해 유효성을 검증**하고, 거기에 MLOps·RAG를 얹은 것이다.
-전체 맥락은 [저장소 README](../README.md) 참고.
+이 방법론은 처음에 사출성형 데이터에 적용했지만, 평가셋의 진짜 불량이 18건뿐이라
+성능이 낮았던 원인이 방법론인지 데이터인지 판단할 수 없었다. 그래서 같은 방법론을
+**CNC 가공 데이터에 재적용해 유효성을 검증**하고(위 성능), 거기에 MLOps·RAG를 얹었다.
+
+처음 본다면 **[`docs/STRUCTURE.md`](docs/STRUCTURE.md)**부터 — 세 단계 흐름과 폴더
+역할이 한 장에 정리돼 있다.
 
 ## 1. 다른 PC에서 처음 설정하기
 
@@ -18,12 +23,10 @@ p95 임계값 기준). 정상 실험 11개 LOOCV에서도 9개를 정상으로 �
 
 ```bash
 git clone git@github.com:ojeongu63-lab/hanium.git
-cd hanium/hanium/02-cnc-machining
+cd hanium
 ```
 
-`hanium`이 두 번 들어가는 게 오타가 아님 — 저장소 이름이 `hanium`이라 clone하면
-그 이름의 폴더가 생기고, 저장소 안에서 이 프로젝트가 다시 `hanium/` 아래에 있어서
-그렇다(저장소 최상위는 여러 프로젝트를 담고 있음).
+이하 모든 명령은 이 저장소 루트(`hanium/`)에서 실행한다.
 
 처음 clone하는 PC라면 GitHub SSH 키가 그 PC에 없을 수 있음 — 그 경우:
 
@@ -35,29 +38,32 @@ cat ~/.ssh/id_ed25519.pub   # 출력된 걸 https://github.com/settings/keys 에
 ### 1-2. 데이터 배치 (★ 경로 중요)
 
 `data/` 폴더는 git에 안 올라가 있음(`.gitignore` 대상, 원본/전처리 데이터·학습된
-모델·MLflow 기록이 들어있어서). 별도로 옮긴 `cnc-data.tar.gz`를 **`02-cnc-machining/`
-바로 아래**(즉 `hanium/02-cnc-machining/data/`)에 풀어야 함:
+모델·MLflow 기록이 들어있어서). 별도로 옮긴 `cnc-data.tar.gz`를 **저장소 루트
+바로 아래**(즉 `hanium/data/`)에 풀어야 함:
 
 ```bash
-# cnc-data.tar.gz를 이 PC로 옮긴 뒤, hanium/02-cnc-machining/ 안에서:
+# cnc-data.tar.gz를 이 PC로 옮긴 뒤, 저장소 루트(hanium/)에서:
 tar -xzf ~/cnc-data.tar.gz -C .
 ```
 
 풀고 나면 아래 구조가 나와야 정상:
 
 ```
-02-cnc-machining/data/
+hanium/data/
 ├── dataset/    # 원본 CNC CSV (실험별 raw 데이터, 폴더명에 한글/공백 포함)
 ├── processed/  # train.csv, eval.csv, scaler.json, manifest.json (전처리 결과)
 ├── model/      # 학습 산출물 (model.pt, evaluation_report.json 등)
 └── mlflow/     # MLflow sqlite DB + 모델 아티팩트 (mlflow.db, artifacts/)
 ```
 
-경로가 이거랑 다르면(`data/`가 `02-cnc-machining/` 밖에 있거나 한 단계 더 들어가 있으면)
+경로가 이거랑 다르면(`data/`가 저장소 루트 밖에 있거나 한 단계 더 들어가 있으면)
 아래 실행 명령이 전부 실패함 — `src/lstm_ae/tracking.py`의 `ROOT`가
-`02-cnc-machining/` 기준으로 `data/mlflow/`를 하드코딩해서 찾기 때문.
+저장소 루트 기준으로 `data/mlflow/`를 하드코딩해서 찾기 때문.
 
 ### 1-3. 의존성 설치
+
+Python 3.14, 패키지 관리는 [uv](https://docs.astral.sh/uv/). PyTorch는 **CPU 빌드** —
+작업 서버에 GPU가 없어서 모델·배치 크기를 CPU에서 감당할 수 있는 선으로 설계했다.
 
 ```bash
 uv sync
@@ -66,7 +72,7 @@ uv sync
 ### 1-4. RAG용 OpenAI API 키 설정 (선택)
 
 `/predict`가 불량 판정을 낼 때 현장 조치 가이드(`guide` 필드)를 생성하려면
-OpenAI API 키가 필요함. `02-cnc-machining/` 바로 아래에 `.env` 파일을 만들고:
+OpenAI API 키가 필요함. 저장소 루트 바로 아래에 `.env` 파일을 만들고:
 
 ```
 OPENAI_API_KEY=sk-...
@@ -81,7 +87,6 @@ OPENAI_API_KEY=sk-...
 ### 2-1. 추론 서버 (FastAPI)
 
 ```bash
-cd 02-cnc-machining
 nice -n 19 uv run uvicorn serving.app:app --port 8899
 ```
 
@@ -120,7 +125,6 @@ data/dataset/CNC 비식별화 원본데이터_1209/CNC Virtual Data set _v2/expe
 ### 2-2. MLflow UI (실험 추적 대시보드)
 
 ```bash
-cd 02-cnc-machining
 nice -n 19 uv run mlflow ui --backend-store-uri sqlite:///$(pwd)/data/mlflow/mlflow.db --port 5099
 ```
 
@@ -145,7 +149,6 @@ sed -i 's/from importlib.abc import Traversable/from importlib.resources.abc imp
 ### 2-3. 새로 학습 / champion 승격 (참고용, 매번 할 필요 없음)
 
 ```bash
-cd 02-cnc-machining
 nice -n 19 uv run python scripts/run_lstm_training.py   # MLflow에 새 run 기록 + 모델 등록
 uv run python scripts/promote_model.py <등록된 버전 번호>  # 그 버전을 champion으로 승격
 ```
@@ -162,7 +165,6 @@ uv run python scripts/promote_model.py <등록된 버전 번호>  # 그 버전�
 변환하고 FAISS 인덱스로 저장함(42청크):
 
 ```bash
-cd 02-cnc-machining
 uv run --env-file .env python rag/build_corpus.py
 ```
 
@@ -179,7 +181,6 @@ uv run --env-file .env python rag/build_corpus.py
 없음(완전히 분리된 산출물):
 
 ```bash
-cd 02-cnc-machining
 who && top -bn1 | head -6   # 서버 여유 확인 (11번의 전체 학습이 순차 실행됨, 수 분 소요)
 nice -n 19 uv run python loocv/run_loocv.py
 ```
@@ -196,7 +197,6 @@ nice -n 19 uv run python loocv/run_loocv.py
 멈추므로, 실제 불량 실험의 배율 대역 1.0~3.8과 비슷한 크기가 된다):
 
 ```bash
-cd 02-cnc-machining
 nice -n 19 uv run python synthetic/generate_synthetic.py
 ```
 
@@ -231,15 +231,12 @@ curl -s -X POST "http://127.0.0.1:8899/predict" -F "file=@synthetic/scenarios/to
 
 ```bash
 # 터미널 1 — 서빙
-cd 02-cnc-machining
 nice -n 19 uv run uvicorn src.serving.app:app --app-dir . --port 8000
 
 # 터미널 2 — 감시 워커 (실제 서버를 폴링, 드리프트 잡히면 재학습·게이트·승격까지)
-cd 02-cnc-machining
 nice -n 19 uv run --env-file .env python monitoring/drift_worker.py temperature --base-url http://127.0.0.1:8000 --poll-interval 5
 
 # 터미널 3 — feeder (가상 운영 배치를 실제 서버에 흘려보냄)
-cd 02-cnc-machining
 nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 --serve-url http://127.0.0.1:8000 --pace-seconds 15
 ```
 
@@ -275,7 +272,6 @@ nice -n 19 uv run python monitoring/simulate_timeline.py temperature --days 40 -
 **docker compose로 같은 것을 한 명령으로** (docker 가 있는 PC — 이미지 안에 코드·의존성, `data/`는 볼륨):
 
 ```bash
-cd 02-cnc-machining
 SCENARIO=temperature DAYS=40 PACE=15 docker compose --profile demo up
 ```
 
@@ -318,7 +314,6 @@ SCENARIO=temperature DAYS=40 PACE=15 docker compose --profile demo up
 워커·feeder까지 함께 띄우려면 §2-7 끝의 compose 설명을 본다.
 
 ```bash
-cd 02-cnc-machining
 docker build -t cnc-serving .
 docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 ```
@@ -347,7 +342,7 @@ docker run -p 8000:8000 -v "$(pwd)/data:/app/data" cnc-serving
 **실시간 모드 (같은 카드를 실제 `/predict`로 다시 계산):**
 
 1. 회사 PC에서 `data/`를 묶어 옮긴다 — `tar -czf cnc-data.tar.gz --exclude=data/monitoring data`
-   (60MB 안팎). 개인 PC의 `02-cnc-machining/` 바로 아래에 풀어 §1-2 구조가 되게 한다.
+   (60MB 안팎). 개인 PC의 저장소 루트 바로 아래에 풀어 §1-2 구조가 되게 한다.
    MLflow가 저장한 절대경로는 첫 실행 때 `src/lstm_ae/tracking.py`가 이 PC 기준으로
    고치므로 재학습이 필요 없다.
 2. `uv sync`

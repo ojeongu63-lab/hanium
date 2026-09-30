@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # importlib 모드라 
 
 from fixture_dataset import write_dataset  # noqa: E402
 
-PROJECT = Path(__file__).resolve().parents[2]  # 02-cnc-machining/
+PROJECT = Path(__file__).resolve().parents[2]  # 저장소 루트
 SCRIPTS = PROJECT / "scripts"
 MONITORING = PROJECT / "monitoring"
 DATASET_DIRNAME = "CNC 비식별화 원본데이터_1209"  # config.DATASET_DIR 의 마지막 요소
