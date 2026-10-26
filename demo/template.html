@@ -18,6 +18,7 @@
   nav.tabs button { border:1px solid var(--line); border-bottom:none; background:#eef0f4; padding:8px 16px; cursor:pointer; border-radius:8px 8px 0 0; font-size:14px; }
   nav.tabs button.active { background:#fff; font-weight:700; }
   main { padding:16px 24px 40px; }
+  [hidden] { display:none !important; }  /* 탭 섹션의 hidden 이 아래 #tab-batch·#tab-sim 의 display:grid 에 밀리지 않게 */
   #tab-batch { display:grid; grid-template-columns:260px 1fr; gap:16px; }
   aside, .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
   aside h2, .card h3 { margin:0 0 10px; font-size:14px; color:var(--accent); }
