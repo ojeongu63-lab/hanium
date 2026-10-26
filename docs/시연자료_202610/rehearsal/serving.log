@@ -1,0 +1,79 @@
+INFO:     Started server process [141049]
+INFO:     Waiting for application startup.
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 2920.82it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1877.49it/s]
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1541.46it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1245.34it/s]
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:43246 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43254 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36940 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36940 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36940 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36940 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36940 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36946 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53510 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46812 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45232 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45232 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45232 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45232 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45232 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45248 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51738 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51738 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51738 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51738 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51738 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51740 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43796 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34476 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51146 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51146 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51146 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51146 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51146 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36728 - "GET /drift-status HTTP/1.1" 200 OK
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1402.31it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1097.99it/s]
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1341.75it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1059.17it/s]
+INFO:     127.0.0.1:50192 - "POST /start-shadow HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38218 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38218 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38218 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38218 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38218 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38230 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52380 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52380 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52380 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52380 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52380 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52392 - "GET /drift-status HTTP/1.1" 200 OK
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1167.35it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 941.27it/s] 
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 2316.02it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1763.05it/s]
+INFO:     127.0.0.1:52392 - "POST /reload-model HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52392 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52392 - "POST /stop-shadow HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51684 - "GET /drift-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46226 - "GET /health HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [141049]
+/usr/lib/python3.14/multiprocessing/resource_tracker.py:396: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-n6svkxt6'}
+  warnings.warn(

@@ -1,0 +1,5 @@
+== 워커 로그 중 Day/이벤트 줄 (action=none 제외) ==
+
+== 종료 시점 상태 ==
+/health: {"status":"ok","model_version":"65","mlflow_run_id":"b3c4e204857243da9d59b9322d796860"}
+MLflow alias: [('cnc-lstm-ae', 'champion', 65)]
